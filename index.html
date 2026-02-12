@@ -1046,9 +1046,9 @@ body.theme-green {
     <div class="config-row">
       <span class="config-label">Cell Size</span>
       <div class="config-slider-wrap">
-        <input type="range" id="cfgCellSize" min="28" max="160" value="48" step="2">
+        <input type="range" id="cfgCellSize" min="28" max="160" value="56" step="2">
       </div>
-      <span class="config-value" id="cfgCellSizeVal">48</span>
+      <span class="config-value" id="cfgCellSizeVal">56</span>
     </div>
   </div>
 
@@ -1058,16 +1058,16 @@ body.theme-green {
     <div class="config-row">
       <span class="config-label">Flip Speed</span>
       <div class="config-slider-wrap">
-        <input type="range" id="cfgSpeed" min="40" max="800" value="100" step="10">
+        <input type="range" id="cfgSpeed" min="40" max="800" value="160" step="10">
       </div>
-      <span class="config-value" id="cfgSpeedVal">100ms</span>
+      <span class="config-value" id="cfgSpeedVal">160ms</span>
     </div>
     <div class="config-row">
       <span class="config-label">Stagger</span>
       <div class="config-slider-wrap">
-        <input type="range" id="cfgStagger" min="0" max="80" value="20" step="5">
+        <input type="range" id="cfgStagger" min="0" max="80" value="30" step="5">
       </div>
-      <span class="config-value" id="cfgStaggerVal">20ms</span>
+      <span class="config-value" id="cfgStaggerVal">30ms</span>
     </div>
     <div class="config-row">
       <span class="config-label">Direction</span>
@@ -1087,16 +1087,16 @@ body.theme-green {
     <div class="config-row">
       <span class="config-label">Jitter</span>
       <div class="config-slider-wrap">
-        <input type="range" id="cfgJitter" min="0" max="60" value="15" step="5">
+        <input type="range" id="cfgJitter" min="0" max="60" value="20" step="5">
       </div>
-      <span class="config-value" id="cfgJitterVal">15ms</span>
+      <span class="config-value" id="cfgJitterVal">20ms</span>
     </div>
     <div class="config-row">
       <span class="config-label">Extra Flips</span>
       <div class="config-slider-wrap">
-        <input type="range" id="cfgExtraFlips" min="0" max="8" value="3" step="1">
+        <input type="range" id="cfgExtraFlips" min="0" max="8" value="2" step="1">
       </div>
-      <span class="config-value" id="cfgExtraFlipsVal">3</span>
+      <span class="config-value" id="cfgExtraFlipsVal">2</span>
     </div>
   </div>
 
@@ -1117,9 +1117,9 @@ body.theme-green {
     <div class="config-row">
       <span class="config-label">Volume</span>
       <div class="config-slider-wrap">
-        <input type="range" id="cfgVolume" min="0" max="100" value="40" step="5">
+        <input type="range" id="cfgVolume" min="0" max="100" value="35" step="5">
       </div>
-      <span class="config-value" id="cfgVolumeVal">40%</span>
+      <span class="config-value" id="cfgVolumeVal">35%</span>
     </div>
     <div class="config-row">
       <span class="config-label">Tone</span>
@@ -1240,13 +1240,13 @@ function getShapeSVG(name, style, accent) {
 let settings = {
   rows: 6,
   cols: 20,
-  cellSize: 48,
-  flipSpeed: 100,
-  stagger: 20,
+  cellSize: 56,
+  flipSpeed: 160,
+  stagger: 30,
   flipDirection: 'right',
-  jitter: 15,
-  extraFlips: 3,
-  volume: 40,
+  jitter: 20,
+  extraFlips: 2,
+  volume: 35,
   soundTone: 30,
   soundSnap: 25,
   soundBody: 35,
