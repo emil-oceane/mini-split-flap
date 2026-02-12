@@ -1327,7 +1327,7 @@ let settings = {
   rows: 6,
   cols: 20,
   cellSize: 85,
-  flipSpeed: 120,
+  flipSpeed: 250,
   stagger: 22,
   flipDirection: 'down',
   jitter: 15,
@@ -1382,6 +1382,11 @@ const DEFAULT_SCENES = [
   {
     name: 'Pattern',
     generator: true
+  },
+  {
+    name: 'Waterfall',
+    generator: 'waterfall',
+    flipDirection: 'down'
   },
   {
     name: 'Celebration',
@@ -1458,9 +1463,10 @@ function sceneToTokens(scene, rows, cols) {
 
   if (scene.generator) {
     switch (scene.generator) {
-      case 'datetime': return generateDateTimeScene(rows, cols);
-      case 'weather':  return generateWeatherScene(rows, cols);
-      default:         return generatePatternGrid(rows, cols);
+      case 'datetime':  return generateDateTimeScene(rows, cols);
+      case 'weather':   return generateWeatherScene(rows, cols);
+      case 'waterfall': return generateWaterfallGrid(rows, cols);
+      default:          return generatePatternGrid(rows, cols);
     }
   }
 
@@ -1493,6 +1499,23 @@ function generatePatternGrid(rows, cols) {
         ? shapeToken('square', 'filled', accent)
         : shapeToken('circle', 'outline', accent)
       );
+    }
+    grid.push(row);
+  }
+  return grid;
+}
+
+/* Generate a cascading waterfall pattern */
+function generateWaterfallGrid(rows, cols) {
+  const grid = [];
+  const accent = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#f0a030';
+  const shapes = ['diamond', 'circle', 'square'];
+  for (let r = 0; r < rows; r++) {
+    const row = [];
+    for (let c = 0; c < cols; c++) {
+      const wave = (r + c) % shapes.length;
+      const style = r % 2 === 0 ? 'filled' : 'outline';
+      row.push(shapeToken(shapes[wave], style, accent));
     }
     grid.push(row);
   }
@@ -2118,7 +2141,7 @@ function generateFlipQueue(from, to, extraFlips) {
 }
 
 /* Main entry: apply a new grid with full animation */
-function applyGrid(newGrid, immediate) {
+function applyGrid(newGrid, immediate, opts) {
   const { rows, cols, flipSpeed, stagger, jitter, extraFlips } = settings;
 
   /* Ensure grids match dimensions */
@@ -2150,7 +2173,7 @@ function applyGrid(newGrid, immediate) {
   pendingFlipTimeouts = [];
 
   /* Schedule flips with stagger + jitter */
-  const dir = settings.flipDirection;
+  const dir = (opts && opts.flipDirection) || settings.flipDirection;
   const midR = (rows - 1) / 2;
   const midC = (cols - 1) / 2;
 
@@ -2206,7 +2229,7 @@ function getAllScenes() {
 
 function applyScene(scene, immediate) {
   const grid = sceneToTokens(scene, settings.rows, settings.cols);
-  applyGrid(grid, immediate);
+  applyGrid(grid, immediate, { flipDirection: scene.flipDirection });
 }
 
 /* Board-level 3D flip transition */
