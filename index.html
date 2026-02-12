@@ -2345,6 +2345,8 @@ function startAutoRotate() {
   autoRotateIndex = settings.activeSceneIndex;
   autoRotateTimer = setInterval(() => {
     if (autoRotatePaused) return;
+    /* Wait for ongoing animations to finish before advancing */
+    if (pendingFlipTimeouts.length > 0 || activeFlips.size > 0) return;
     const all = getAllScenes();
     autoRotateIndex = (autoRotateIndex + 1) % all.length;
     applySceneByIndex(autoRotateIndex);
