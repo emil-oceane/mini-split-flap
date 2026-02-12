@@ -1,0 +1,2827 @@
+<!--
+  ╔══════════════════════════════════════════════════════════════╗
+  ║                  MINI SPLIT FLAP                             ║
+  ║          Interactive Retro Display Simulator                 ║
+  ╠══════════════════════════════════════════════════════════════╣
+  ║                                                              ║
+  ║  HOW TO RUN:                                                 ║
+  ║    Open this file in any modern browser (Chrome, Firefox,    ║
+  ║    Safari, Edge). No server required.                        ║
+  ║                                                              ║
+  ║  HOW TO USE:                                                 ║
+  ║    - Click the gear icon (top-right) to open config.         ║
+  ║    - Select a scene from the list to apply it.               ║
+  ║    - Edit scenes using text + {shape} syntax:                ║
+  ║        e.g. "{triangle} DELAYED {triangle}"                  ║
+  ║        Shapes: circle, square, triangle, diamond, arrow,     ║
+  ║                heart, star, check, x                         ║
+  ║        Styles: {shape:outline} or {shape:filled:#ff0}        ║
+  ║    - Adjust rows, columns, speed, jitter, and volume.        ║
+  ║    - Enable auto-rotate for slideshow mode.                  ║
+  ║    - Click the speaker icon (bottom-right) to mute.          ║
+  ║    - All settings persist in localStorage.                   ║
+  ║                                                              ║
+  ║  HOW TO ADD SCENES:                                          ║
+  ║    Open config → click "+ Add Scene" → type your message     ║
+  ║    using the text editor → click "Save". Use {shapeName}     ║
+  ║    syntax inline to insert SVG shapes.                       ║
+  ║                                                              ║
+  ╚══════════════════════════════════════════════════════════════╝
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Mini Split Flap — Interactive Retro Departure Board Simulator</title>
+<meta name="description" content="Mini Split Flap is a realistic split-flap display simulator with animated flipping letters, mechanical sounds, customizable scenes, live clock, weather, and market data. No install required — runs entirely in your browser.">
+<meta name="keywords" content="mini split flap, split-flap display, departure board, flip board, solari board, retro display, flight board, train station display, mechanical display simulator">
+<meta name="author" content="Emil Tarazi">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://minisplitflap.com/">
+
+<!-- Open Graph / Facebook -->
+<meta property="og:type" content="website">
+<meta property="og:title" content="Mini Split Flap — Interactive Retro Departure Board Simulator">
+<meta property="og:description" content="A realistic split-flap display simulator with animated flipping letters, mechanical clacking sounds, and customizable messages. Runs entirely in your browser.">
+<meta property="og:url" content="https://minisplitflap.com/">
+<meta property="og:site_name" content="Mini Split Flap">
+
+<!-- Twitter -->
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Mini Split Flap — Interactive Retro Departure Board Simulator">
+<meta name="twitter:description" content="A realistic split-flap display simulator with animated flipping letters, mechanical clacking sounds, and customizable messages.">
+<meta name="twitter:image" content="https://minisplitflap.com/og-image.png">
+
+<!-- Open Graph Image -->
+<meta property="og:image" content="https://minisplitflap.com/og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Mini Split Flap display showing WELCOME HOME in white letters on a dark mechanical board">
+
+<!-- Theme / PWA -->
+<meta name="theme-color" content="#1a1a1a">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Mini Split Flap">
+
+<!-- Structured Data -->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "WebApplication",
+  "name": "Mini Split Flap",
+  "url": "https://minisplitflap.com/",
+  "description": "Mini Split Flap is a realistic interactive split-flap display simulator inspired by the mechanical departure boards found in train stations and airports. Features animated flipping letters with authentic mechanical sounds, customizable scenes, live clock, weather, and market data.",
+  "applicationCategory": "Entertainment",
+  "operatingSystem": "Any",
+  "browserRequirements": "Requires a modern web browser",
+  "image": "https://minisplitflap.com/og-image.png",
+  "offers": {
+    "@type": "Offer",
+    "price": "0",
+    "priceCurrency": "USD"
+  }
+}
+</script>
+<style>
+/* ══════════════════════════════════════════
+   VARIABLES & RESET
+   ══════════════════════════════════════════ */
+:root {
+  --cell-w: 48px;
+  --cell-h: 68px;
+  --cell-gap: 3px;
+  --cell-radius: 4px;
+  --cell-bg: #1a1a1a;
+  --cell-bg-upper: #1c1c1c;
+  --cell-bg-lower: #151515;
+  --cell-text: #e8d5a3;
+  --cell-text-shadow: rgba(232,213,163,0.15);
+  --hinge-color: #0a0a0a;
+  --board-bg: #2a2a2a;
+  --board-border: #3a3a3a;
+  --accent: #f0a030;
+  --accent-dim: #c08020;
+  --page-bg: #0e0e0e;
+  --drawer-bg: #1a1a1a;
+  --drawer-border: #333;
+  --text-primary: #e0e0e0;
+  --text-secondary: #888;
+  --text-dim: #555;
+  --input-bg: #252525;
+  --input-border: #3a3a3a;
+  --btn-bg: #333;
+  --btn-hover: #444;
+  --danger: #c0392b;
+  --success: #27ae60;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  width: 100%; height: 100%;
+  overflow: hidden;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+body {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--page-bg);
+  color: var(--text-primary);
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* ══════════════════════════════════════════
+   PAGE LAYOUT
+   ══════════════════════════════════════════ */
+#app {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  padding: 4px;
+}
+
+/* ══════════════════════════════════════════
+   BOARD FRAME — physical appearance
+   ══════════════════════════════════════════ */
+.board-frame {
+  position: relative;
+  background: var(--board-bg);
+  border-radius: 10px;
+  padding: 0;
+  transform-origin: center center;
+  box-shadow:
+    0 2px 4px rgba(0,0,0,0.3),
+    0 8px 30px rgba(0,0,0,0.4),
+    0 20px 60px rgba(0,0,0,0.3),
+    0 0 80px rgba(240,160,48,0.015);
+  border: 2px solid var(--board-border);
+  border-top-color: #444;
+  border-left-color: #404040;
+  border-bottom-color: #222;
+  border-right-color: #252525;
+}
+
+.board-inner {
+  position: relative;
+  padding: 14px 20px;
+  overflow: hidden;
+  border-radius: 8px;
+}
+
+/* Noise / grain overlay */
+.board-grain {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  z-index: 5;
+  opacity: 0.035;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='256' height='256' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-size: 256px 256px;
+}
+
+/* Screws */
+.screw {
+  position: absolute;
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, #4a4a4a, #1a1a1a);
+  box-shadow:
+    inset 0 1px 1px rgba(255,255,255,0.12),
+    0 1px 2px rgba(0,0,0,0.6);
+  z-index: 10;
+}
+.screw::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 20%;
+  right: 20%;
+  height: 1.5px;
+  background: #2a2a2a;
+  transform: translateY(-50%) rotate(var(--screw-angle, 30deg));
+  border-radius: 1px;
+}
+.screw-tl { top: 6px; left: 6px; --screw-angle: 25deg; }
+.screw-tr { top: 6px; right: 6px; --screw-angle: -15deg; }
+.screw-bl { bottom: 6px; left: 6px; --screw-angle: 45deg; }
+.screw-br { bottom: 6px; right: 6px; --screw-angle: -35deg; }
+
+/* ══════════════════════════════════════════
+   HEADER & FOOTER BARS
+   ══════════════════════════════════════════ */
+.board-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px 6px;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+  min-height: 36px;
+}
+.board-header-title {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  color: var(--accent);
+  opacity: 0.8;
+}
+.board-header-clock {
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 1.5px;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+.board-header-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.board-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 5px 12px 7px;
+  border-top: 1px solid rgba(255,255,255,0.04);
+  min-height: 32px;
+}
+.board-footer-status {
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+.board-footer-status .dot {
+  display: inline-block;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--success);
+  margin-right: 6px;
+  vertical-align: middle;
+  box-shadow: 0 0 4px rgba(39,174,96,0.4);
+}
+.board-footer-actions {
+  display: flex;
+  gap: 6px;
+}
+
+/* Icon buttons */
+.icon-btn {
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s, color 0.15s;
+  padding: 0;
+}
+.icon-btn:hover { background: rgba(255,255,255,0.06); color: var(--text-primary); }
+.icon-btn:active { background: rgba(255,255,255,0.1); }
+.icon-btn svg { width: 16px; height: 16px; }
+.icon-btn.muted svg { color: var(--danger); opacity: 0.7; }
+
+/* ══════════════════════════════════════════
+   BOARD GRID
+   ══════════════════════════════════════════ */
+.board-grid {
+  display: grid;
+  gap: var(--cell-gap);
+  padding: 4px 0;
+}
+
+/* ══════════════════════════════════════════
+   CELL STYLING
+   ══════════════════════════════════════════ */
+.sf-cell {
+  position: relative;
+  width: var(--cell-w);
+  height: var(--cell-h);
+  border-radius: var(--cell-radius);
+  overflow: hidden;
+}
+
+.cell-inner {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  border-radius: var(--cell-radius);
+  perspective: 300px;
+  overflow: hidden;
+  box-shadow:
+    inset 0 1px 3px rgba(0,0,0,0.6),
+    inset 0 -1px 1px rgba(0,0,0,0.2),
+    0 1px 0 rgba(255,255,255,0.025);
+}
+
+/* Upper / Lower static halves */
+.cell-upper, .cell-lower {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 50%;
+  overflow: hidden;
+  z-index: 0;
+}
+.cell-upper {
+  top: 0;
+  background: var(--cell-bg-upper);
+  border-radius: var(--cell-radius) var(--cell-radius) 0 0;
+  /* Subtle highlight at top */
+  background: linear-gradient(to bottom, #1f1f1f 0%, var(--cell-bg-upper) 40%, var(--cell-bg) 100%);
+}
+.cell-lower {
+  bottom: 0;
+  background: var(--cell-bg-lower);
+  border-radius: 0 0 var(--cell-radius) var(--cell-radius);
+  background: linear-gradient(to bottom, #131313 0%, var(--cell-bg-lower) 100%);
+}
+
+/* Content inside each half — renders full char, clipped */
+.cell-content {
+  position: absolute;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+.cell-upper .cell-content {
+  top: 0;
+  height: 200%;
+}
+.cell-lower .cell-content {
+  bottom: 0;
+  height: 200%;
+}
+
+/* Character display */
+.char-display {
+  font-family: 'Menlo', 'Consolas', 'SF Mono', 'Courier New', monospace;
+  font-weight: 700;
+  color: var(--cell-text);
+  line-height: 1;
+  text-shadow: 0 0 8px var(--cell-text-shadow);
+  /* Size set dynamically via JS based on cell height */
+}
+
+/* Shape SVG display */
+.shape-svg {
+  display: block;
+  color: var(--accent);
+}
+
+/* Hinge line */
+.cell-hinge {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: 2px;
+  margin-top: -1px;
+  z-index: 4;
+  background: var(--hinge-color);
+  box-shadow: 0 1px 0 rgba(255,255,255,0.03);
+}
+
+/* ══════════════════════════════════════════
+   FLAP ANIMATION
+   ══════════════════════════════════════════ */
+.cell-flap {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 50%;
+  transform-origin: center bottom;
+  transform-style: preserve-3d;
+  z-index: 3;
+  will-change: transform;
+  display: none;
+}
+
+.flap-face {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  overflow: hidden;
+  border-radius: var(--cell-radius) var(--cell-radius) 0 0;
+}
+
+.flap-front {
+  background: linear-gradient(to bottom, #1f1f1f 0%, var(--cell-bg-upper) 40%, var(--cell-bg) 100%);
+}
+.flap-front .cell-content {
+  top: 0;
+  height: 200%;
+}
+
+.flap-back {
+  transform: rotateX(180deg);
+  background: linear-gradient(to bottom, #131313 0%, var(--cell-bg-lower) 100%);
+  border-radius: 0 0 var(--cell-radius) var(--cell-radius);
+}
+.flap-back .cell-content {
+  bottom: 0;
+  height: 200%;
+}
+
+/* Shadow under flap during animation */
+.cell-flap-shadow {
+  position: absolute;
+  left: -1px;
+  right: -1px;
+  top: 50%;
+  height: 35%;
+  background: linear-gradient(to bottom, rgba(0,0,0,0.6), transparent);
+  z-index: 2;
+  opacity: 0;
+  pointer-events: none;
+  will-change: opacity, transform;
+}
+
+/* Cell gloss highlight */
+.cell-inner::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 45%;
+  background: linear-gradient(to bottom, rgba(255,255,255,0.03), transparent);
+  pointer-events: none;
+  z-index: 6;
+  border-radius: var(--cell-radius) var(--cell-radius) 0 0;
+}
+
+/* Dust/noise overlay per cell */
+.cell-dust {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 5;
+  opacity: 0;
+  border-radius: var(--cell-radius);
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 64 64' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='d'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.2' numOctaves='2' seed='42'/%3E%3C/filter%3E%3Crect width='64' height='64' filter='url(%23d)'/%3E%3C/svg%3E");
+  background-size: 64px 64px;
+}
+
+/* ══════════════════════════════════════════
+   CONFIG DRAWER
+   ══════════════════════════════════════════ */
+.config-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.55);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s ease;
+  z-index: 99;
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+}
+.config-overlay.active {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.config-drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 380px;
+  max-width: 92vw;
+  background: var(--drawer-bg);
+  border-left: 1px solid var(--drawer-border);
+  transform: translateX(100%);
+  transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+  z-index: 100;
+  overflow-y: auto;
+  overflow-x: hidden;
+  box-shadow: -8px 0 40px rgba(0,0,0,0.5);
+  scrollbar-width: thin;
+  scrollbar-color: #333 transparent;
+}
+.config-drawer::-webkit-scrollbar { width: 6px; }
+.config-drawer::-webkit-scrollbar-track { background: transparent; }
+.config-drawer::-webkit-scrollbar-thumb { background: #333; border-radius: 3px; }
+.config-drawer.open { transform: translateX(0); }
+
+.config-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--drawer-border);
+  position: sticky;
+  top: 0;
+  background: var(--drawer-bg);
+  z-index: 2;
+}
+.config-header h2 {
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--text-primary);
+}
+.config-close {
+  width: 30px; height: 30px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 20px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s, color 0.15s;
+  line-height: 1;
+}
+.config-close:hover { background: rgba(255,255,255,0.08); color: var(--text-primary); }
+
+.config-section {
+  padding: 16px 20px;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+}
+.config-section h3 {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  margin-bottom: 14px;
+}
+
+/* Form controls */
+.config-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+.config-row:last-child { margin-bottom: 0; }
+.config-label {
+  font-size: 12px;
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
+.config-value {
+  font-size: 11px;
+  color: var(--text-dim);
+  min-width: 32px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  margin-left: 8px;
+}
+.config-select {
+  background: var(--input-bg);
+  border: 1px solid var(--input-border);
+  border-radius: 6px;
+  color: var(--text-primary);
+  font-size: 11px;
+  padding: 4px 8px;
+  outline: none;
+  cursor: pointer;
+  margin-left: auto;
+}
+.config-select:focus { border-color: var(--accent-dim); }
+.config-slider-wrap {
+  flex: 1;
+  margin: 0 10px;
+  position: relative;
+}
+
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 4px;
+  background: #333;
+  border-radius: 2px;
+  outline: none;
+  cursor: pointer;
+}
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--accent);
+  cursor: pointer;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.4);
+  transition: transform 0.1s;
+}
+input[type="range"]::-webkit-slider-thumb:hover {
+  transform: scale(1.15);
+}
+input[type="range"]::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: none;
+  cursor: pointer;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.4);
+}
+
+input[type="checkbox"] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 36px;
+  height: 20px;
+  background: #333;
+  border-radius: 10px;
+  position: relative;
+  cursor: pointer;
+  transition: background 0.2s;
+  flex-shrink: 0;
+}
+input[type="checkbox"]::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #888;
+  transition: transform 0.2s, background 0.2s;
+}
+input[type="checkbox"]:checked {
+  background: var(--accent-dim);
+}
+input[type="checkbox"]:checked::after {
+  transform: translateX(16px);
+  background: var(--accent);
+}
+
+/* Scene list */
+.scene-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 12px;
+}
+.scene-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: var(--input-bg);
+  cursor: pointer;
+  transition: background 0.15s;
+  border: 1px solid transparent;
+}
+.scene-item:hover { background: #2a2a2a; }
+.scene-item.active {
+  border-color: var(--accent-dim);
+  background: rgba(240,160,48,0.06);
+}
+.scene-item-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary);
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.scene-item-actions {
+  display: flex;
+  gap: 4px;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.scene-item:hover .scene-item-actions { opacity: 1; }
+.scene-item-btn {
+  width: 24px;
+  height: 24px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-dim);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  transition: background 0.15s, color 0.15s;
+}
+.scene-item-btn:hover { background: rgba(255,255,255,0.08); color: var(--text-primary); }
+.scene-item-btn.delete:hover { color: var(--danger); }
+
+/* Add scene / action buttons */
+.config-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border: 1px solid var(--input-border);
+  border-radius: 6px;
+  background: var(--btn-bg);
+  color: var(--text-primary);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.config-btn:hover { background: var(--btn-hover); border-color: #555; }
+.config-btn.primary {
+  background: var(--accent-dim);
+  border-color: var(--accent);
+  color: #fff;
+}
+.config-btn.primary:hover { background: var(--accent); }
+.config-btn.small { padding: 5px 10px; font-size: 11px; }
+
+/* Scene editor */
+.scene-editor {
+  display: none;
+}
+.scene-editor.active { display: block; }
+.scene-editor textarea {
+  width: 100%;
+  height: 140px;
+  background: var(--input-bg);
+  border: 1px solid var(--input-border);
+  border-radius: 6px;
+  color: var(--text-primary);
+  font-family: 'Menlo', 'Consolas', 'SF Mono', monospace;
+  font-size: 12px;
+  padding: 10px;
+  resize: vertical;
+  outline: none;
+  margin-bottom: 10px;
+  line-height: 1.6;
+}
+.scene-editor textarea:focus { border-color: var(--accent-dim); }
+.scene-editor-name {
+  width: 100%;
+  background: var(--input-bg);
+  border: 1px solid var(--input-border);
+  border-radius: 6px;
+  color: var(--text-primary);
+  font-size: 12px;
+  padding: 8px 10px;
+  outline: none;
+  margin-bottom: 10px;
+}
+.scene-editor-name:focus { border-color: var(--accent-dim); }
+.shape-palette {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 12px;
+}
+.shape-btn {
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--input-border);
+  border-radius: 4px;
+  background: var(--input-bg);
+  color: var(--accent);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s, border-color 0.15s;
+  padding: 4px;
+}
+.shape-btn:hover { background: #2a2a2a; border-color: var(--accent-dim); }
+.shape-btn svg { width: 18px; height: 18px; }
+.editor-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+/* Theme selector */
+.theme-options {
+  display: flex;
+  gap: 8px;
+}
+.theme-swatch {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  cursor: pointer;
+  transition: border-color 0.15s, transform 0.1s;
+}
+.theme-swatch:hover { transform: scale(1.1); }
+.theme-swatch.active { border-color: var(--accent); }
+
+/* ══════════════════════════════════════════
+   RESPONSIVE
+   ══════════════════════════════════════════ */
+@media (max-width: 768px) {
+  #app { padding: 8px; }
+  .board-inner { padding: 10px 12px; }
+  .config-drawer { width: 100%; max-width: 100%; }
+  .board-header-title { font-size: 10px; letter-spacing: 2px; }
+}
+
+/* ══════════════════════════════════════════
+   REDUCED MOTION
+   ══════════════════════════════════════════ */
+@media (prefers-reduced-motion: reduce) {
+  .cell-flap { display: none !important; }
+  .config-drawer { transition: none; }
+  .config-overlay { transition: none; }
+}
+
+/* ══════════════════════════════════════════
+   THEME VARIATIONS
+   ══════════════════════════════════════════ */
+body.theme-midnight {
+  --page-bg: #080c14;
+  --board-bg: #1a2030;
+  --board-border: #2a3548;
+  --cell-bg: #141a28;
+  --cell-bg-upper: #161c2c;
+  --cell-bg-lower: #101624;
+  --cell-text: #a0c4e8;
+  --cell-text-shadow: rgba(160,196,232,0.12);
+  --hinge-color: #0a0e18;
+  --accent: #4a9eff;
+  --accent-dim: #2a6ecc;
+  --drawer-bg: #141a28;
+  --drawer-border: #2a3548;
+  --input-bg: #1a2030;
+  --input-border: #2a3548;
+  --btn-bg: #1e2840;
+  --btn-hover: #283450;
+}
+body.theme-warm {
+  --page-bg: #12100e;
+  --board-bg: #2e2824;
+  --board-border: #3e3530;
+  --cell-bg: #1e1a16;
+  --cell-bg-upper: #201c18;
+  --cell-bg-lower: #181410;
+  --cell-text: #f0d8a0;
+  --cell-text-shadow: rgba(240,216,160,0.15);
+  --hinge-color: #0e0c08;
+  --accent: #e88020;
+  --accent-dim: #c06818;
+  --drawer-bg: #1e1a16;
+  --drawer-border: #3e3530;
+  --input-bg: #2a2420;
+  --input-border: #3e3530;
+  --btn-bg: #342e28;
+  --btn-hover: #443c34;
+}
+body.theme-green {
+  --page-bg: #0a100a;
+  --board-bg: #1a261a;
+  --board-border: #2a382a;
+  --cell-bg: #141e14;
+  --cell-bg-upper: #162016;
+  --cell-bg-lower: #101a10;
+  --cell-text: #80e080;
+  --cell-text-shadow: rgba(128,224,128,0.12);
+  --hinge-color: #0a100a;
+  --accent: #40c040;
+  --accent-dim: #309030;
+  --drawer-bg: #141e14;
+  --drawer-border: #2a382a;
+  --input-bg: #1a261a;
+  --input-border: #2a382a;
+  --btn-bg: #1e2e1e;
+  --btn-hover: #283828;
+}
+</style>
+</head>
+<body>
+
+<!-- Accessible description for SEO and screen readers -->
+<div id="seoContent" style="position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden;" aria-hidden="false">
+  <h1>Mini Split Flap — Interactive Retro Departure Board Simulator</h1>
+  <p>
+    Mini Split Flap brings the nostalgia of a classic split-flap display right to your browser.
+    Also known as a Solari board, flip-dot display, or mechanical departure board,
+    these iconic displays were once the heartbeat of train stations and airports worldwide,
+    announcing arrivals and departures with their unmistakable cascading clatter.
+  </p>
+  <p>
+    This interactive simulator recreates that experience with realistic 3D flip animations,
+    authentic mechanical clacking sounds, and pixel-perfect typography. Every letter flips
+    individually through the character drum — just like the real thing.
+  </p>
+  <h2>Features</h2>
+  <ul>
+    <li>Realistic split-flap animation with 3D CSS transforms and staggered timing</li>
+    <li>Authentic mechanical sound effects generated with the Web Audio API</li>
+    <li>Customizable scenes — write your own messages with text and decorative shapes</li>
+    <li>Live data scenes: real-time clock, local weather, and stock market indices</li>
+    <li>Multiple animation directions: left-to-right, diagonal, center-out, and more</li>
+    <li>Adjustable board size, flip speed, stagger delay, and jitter for fine-tuned aesthetics</li>
+    <li>Four color themes: Charcoal, Midnight, Warm, and Terminal</li>
+    <li>Auto-rotate mode to cycle through scenes like a slideshow</li>
+    <li>Fully responsive — scales to fit any screen size</li>
+    <li>Zero dependencies — runs as a single HTML file, no install or server needed</li>
+    <li>All settings saved locally in your browser</li>
+  </ul>
+  <h2>What is a Split-Flap Display?</h2>
+  <p>
+    A split-flap display, sometimes called a Solari board after the Italian manufacturer
+    Solari di Udine, is an electromechanical display that shows text by rotating through
+    a set of flaps, each printed with a different character. The flaps are split in half
+    horizontally — the top half falls forward to reveal the next character while producing
+    a distinctive clicking sound. These displays were widely used from the 1950s through
+    the 2000s in transportation hubs to show departure and arrival information. Though
+    largely replaced by LED and LCD screens, split-flap displays remain beloved for their
+    tactile, mechanical charm and are experiencing a revival in homes, offices, and art
+    installations.
+  </p>
+</div>
+
+<!-- ═══ MAIN APP ═══ -->
+<div id="app">
+  <div class="board-frame" id="boardFrame">
+    <div class="screw screw-tl"></div>
+    <div class="screw screw-tr"></div>
+    <div class="screw screw-bl"></div>
+    <div class="screw screw-br"></div>
+    <div class="board-grain"></div>
+
+    <div class="board-inner">
+      <div class="board-header">
+        <span class="board-header-title">MINI SPLIT FLAP</span>
+        <span class="board-header-clock" id="headerClock">--:--:--</span>
+        <div class="board-header-actions">
+          <button class="icon-btn" id="btnConfig" title="Configuration" aria-label="Open configuration">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <div class="board-grid" id="boardGrid"></div>
+
+      <div class="board-footer">
+        <span class="board-footer-status"><span class="dot"></span>LOCAL MODE</span>
+        <div class="board-footer-actions">
+          <button class="icon-btn" id="btnMute" title="Toggle sound" aria-label="Toggle sound">
+            <svg id="iconSoundOn" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
+              <path d="M19.07 4.93a10 10 0 0 1 0 14.14"/>
+              <path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>
+            </svg>
+            <svg id="iconSoundOff" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none">
+              <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
+              <line x1="23" y1="9" x2="17" y2="15"/>
+              <line x1="17" y1="9" x2="23" y2="15"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ CONFIG OVERLAY ═══ -->
+<div class="config-overlay" id="configOverlay"></div>
+
+<!-- ═══ CONFIG DRAWER ═══ -->
+<div class="config-drawer" id="configDrawer">
+  <div class="config-header">
+    <h2>Configuration</h2>
+    <button class="config-close" id="configClose" aria-label="Close configuration">&times;</button>
+  </div>
+
+  <!-- Display settings -->
+  <div class="config-section">
+    <h3>Display</h3>
+    <div class="config-row">
+      <span class="config-label">Rows</span>
+      <div class="config-slider-wrap">
+        <input type="range" id="cfgRows" min="1" max="20" value="6" step="1">
+      </div>
+      <span class="config-value" id="cfgRowsVal">6</span>
+    </div>
+    <div class="config-row">
+      <span class="config-label">Columns</span>
+      <div class="config-slider-wrap">
+        <input type="range" id="cfgCols" min="4" max="50" value="20" step="1">
+      </div>
+      <span class="config-value" id="cfgColsVal">20</span>
+    </div>
+    <div class="config-row">
+      <span class="config-label">Cell Size</span>
+      <div class="config-slider-wrap">
+        <input type="range" id="cfgCellSize" min="28" max="160" value="48" step="2">
+      </div>
+      <span class="config-value" id="cfgCellSizeVal">48</span>
+    </div>
+  </div>
+
+  <!-- Animation settings -->
+  <div class="config-section">
+    <h3>Animation</h3>
+    <div class="config-row">
+      <span class="config-label">Flip Speed</span>
+      <div class="config-slider-wrap">
+        <input type="range" id="cfgSpeed" min="40" max="800" value="100" step="10">
+      </div>
+      <span class="config-value" id="cfgSpeedVal">100ms</span>
+    </div>
+    <div class="config-row">
+      <span class="config-label">Stagger</span>
+      <div class="config-slider-wrap">
+        <input type="range" id="cfgStagger" min="0" max="80" value="20" step="5">
+      </div>
+      <span class="config-value" id="cfgStaggerVal">20ms</span>
+    </div>
+    <div class="config-row">
+      <span class="config-label">Direction</span>
+      <select id="cfgFlipDirection" class="config-select">
+        <option value="right">Left to Right</option>
+        <option value="left">Right to Left</option>
+        <option value="down">Top to Bottom</option>
+        <option value="up">Bottom to Top</option>
+        <option value="diagonal-br">Diagonal &#8600;</option>
+        <option value="diagonal-bl">Diagonal &#8601;</option>
+        <option value="diagonal-tr">Diagonal &#8599;</option>
+        <option value="diagonal-tl">Diagonal &#8598;</option>
+        <option value="center">Center Out</option>
+        <option value="random">Random</option>
+      </select>
+    </div>
+    <div class="config-row">
+      <span class="config-label">Jitter</span>
+      <div class="config-slider-wrap">
+        <input type="range" id="cfgJitter" min="0" max="60" value="15" step="5">
+      </div>
+      <span class="config-value" id="cfgJitterVal">15ms</span>
+    </div>
+    <div class="config-row">
+      <span class="config-label">Extra Flips</span>
+      <div class="config-slider-wrap">
+        <input type="range" id="cfgExtraFlips" min="0" max="8" value="3" step="1">
+      </div>
+      <span class="config-value" id="cfgExtraFlipsVal">3</span>
+    </div>
+  </div>
+
+  <!-- Sound settings -->
+  <div class="config-section">
+    <h3>Sound</h3>
+    <div class="config-row">
+      <span class="config-label">Preset</span>
+      <select id="cfgSoundPreset" class="config-select">
+        <option value="waterfall">Waterfall</option>
+        <option value="mechanical">Mechanical</option>
+        <option value="soft">Soft</option>
+        <option value="crisp">Crisp</option>
+        <option value="heavy">Heavy</option>
+        <option value="custom">Custom</option>
+      </select>
+    </div>
+    <div class="config-row">
+      <span class="config-label">Volume</span>
+      <div class="config-slider-wrap">
+        <input type="range" id="cfgVolume" min="0" max="100" value="40" step="5">
+      </div>
+      <span class="config-value" id="cfgVolumeVal">40%</span>
+    </div>
+    <div class="config-row">
+      <span class="config-label">Tone</span>
+      <div class="config-slider-wrap">
+        <input type="range" id="cfgSoundTone" min="0" max="100" value="30" step="5">
+      </div>
+      <span class="config-value" id="cfgSoundToneVal">30</span>
+    </div>
+    <div class="config-row">
+      <span class="config-label">Snap</span>
+      <div class="config-slider-wrap">
+        <input type="range" id="cfgSoundSnap" min="0" max="100" value="25" step="5">
+      </div>
+      <span class="config-value" id="cfgSoundSnapVal">25</span>
+    </div>
+    <div class="config-row">
+      <span class="config-label">Body</span>
+      <div class="config-slider-wrap">
+        <input type="range" id="cfgSoundBody" min="0" max="100" value="35" step="5">
+      </div>
+      <span class="config-value" id="cfgSoundBodyVal">35</span>
+    </div>
+    <div style="margin-top:6px;">
+      <button class="config-btn small" id="btnSoundTest">Test Sound</button>
+    </div>
+  </div>
+
+  <!-- Theme -->
+  <div class="config-section">
+    <h3>Theme</h3>
+    <div class="theme-options" id="themeOptions">
+      <div class="theme-swatch active" data-theme="" style="background: #2a2a2a;" title="Charcoal"></div>
+      <div class="theme-swatch" data-theme="midnight" style="background: #1a2030;" title="Midnight"></div>
+      <div class="theme-swatch" data-theme="warm" style="background: #2e2824;" title="Warm"></div>
+      <div class="theme-swatch" data-theme="green" style="background: #1a261a;" title="Terminal"></div>
+    </div>
+  </div>
+
+  <!-- Scenes -->
+  <div class="config-section">
+    <h3>Scenes</h3>
+    <div class="scene-list" id="sceneList"></div>
+    <div style="display:flex;gap:8px;margin-top:8px;">
+      <button class="config-btn small" id="btnAddScene">+ Add Scene</button>
+      <button class="config-btn small" id="btnResetScenes">Reset to Defaults</button>
+    </div>
+  </div>
+
+  <!-- Live scenes -->
+  <div class="config-section">
+    <h3>Clock</h3>
+    <div class="config-row">
+      <span class="config-label">Show Seconds</span>
+      <input type="checkbox" id="cfgClockSeconds">
+    </div>
+  </div>
+
+  <!-- Auto-rotate -->
+  <div class="config-section">
+    <h3>Auto-Rotate</h3>
+    <div class="config-row">
+      <span class="config-label">Enable</span>
+      <input type="checkbox" id="cfgAutoRotate">
+    </div>
+    <div class="config-row">
+      <span class="config-label">Interval</span>
+      <div class="config-slider-wrap">
+        <input type="range" id="cfgAutoInterval" min="3" max="30" value="8" step="1">
+      </div>
+      <span class="config-value" id="cfgAutoIntervalVal">8s</span>
+    </div>
+  </div>
+
+  <!-- Scene editor -->
+  <div class="config-section scene-editor" id="sceneEditor">
+    <h3 id="editorTitle">Edit Scene</h3>
+    <input class="scene-editor-name" id="editorName" type="text" placeholder="Scene name" maxlength="40">
+    <textarea id="editorText" placeholder="Type message here...&#10;Use {triangle} {heart} {star} etc. for shapes&#10;One line per row"></textarea>
+    <div class="shape-palette" id="shapePalette"></div>
+    <div class="editor-actions">
+      <button class="config-btn small" id="btnEditorCancel">Cancel</button>
+      <button class="config-btn small" id="btnEditorPreview">Preview</button>
+      <button class="config-btn small primary" id="btnEditorSave">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════ -->
+<script>
+/* ══════════════════════════════════════════
+   CONSTANTS
+   ══════════════════════════════════════════ */
+const CHAR_SET = ' ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.,:/-';
+const SHAPE_NAMES = ['circle','square','triangle','diamond','arrow','heart','star','check','x'];
+
+/* Shape SVG generators */
+function getShapeSVG(name, style, accent) {
+  const color = accent || 'currentColor';
+  const fill = style === 'filled' ? color : 'none';
+  const sw = style === 'filled' ? '1' : '2.5';
+  const shapes = {
+    circle:   `<circle cx="12" cy="12" r="8" fill="${fill}" stroke="${color}" stroke-width="${sw}"/>`,
+    square:   `<rect x="4" y="4" width="16" height="16" rx="1.5" fill="${fill}" stroke="${color}" stroke-width="${sw}"/>`,
+    triangle: `<polygon points="12,3 22,20 2,20" fill="${fill}" stroke="${color}" stroke-width="${sw}" stroke-linejoin="round"/>`,
+    diamond:  `<polygon points="12,2 22,12 12,22 2,12" fill="${fill}" stroke="${color}" stroke-width="${sw}" stroke-linejoin="round"/>`,
+    arrow:    `<path d="M12 3l7 8h-4v7h-6v-7H5l7-8z" fill="${fill}" stroke="${color}" stroke-width="${sw}" stroke-linejoin="round"/>`,
+    heart:    `<path d="M12 21C11 20 3 14.5 3 9.5a4.5 4.5 0 0 1 9-1 4.5 4.5 0 0 1 9 1c0 5.5-8 10.5-9 11.5z" fill="${fill}" stroke="${color}" stroke-width="${sw}"/>`,
+    star:     `<polygon points="12,2 14.9,8.6 22,9.3 16.8,13.8 18.2,21 12,17.3 5.8,21 7.2,13.8 2,9.3 9.1,8.6" fill="${fill}" stroke="${color}" stroke-width="${sw}" stroke-linejoin="round"/>`,
+    check:    `<polyline points="4,12 9,18 20,5" fill="none" stroke="${color}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>`,
+    x:        `<line x1="5" y1="5" x2="19" y2="19" stroke="${color}" stroke-width="3" stroke-linecap="round"/><line x1="19" y1="5" x2="5" y2="19" stroke="${color}" stroke-width="3" stroke-linecap="round"/>`
+  };
+  return `<svg viewBox="0 0 24 24" class="shape-svg">${shapes[name] || ''}</svg>`;
+}
+
+/* ══════════════════════════════════════════
+   STATE
+   ══════════════════════════════════════════ */
+let settings = {
+  rows: 6,
+  cols: 20,
+  cellSize: 48,
+  flipSpeed: 100,
+  stagger: 20,
+  flipDirection: 'right',
+  jitter: 15,
+  extraFlips: 3,
+  volume: 40,
+  soundTone: 30,
+  soundSnap: 25,
+  soundBody: 35,
+  soundPreset: 'waterfall',
+  muted: false,
+  theme: '',
+  autoRotate: false,
+  autoRotateInterval: 8,
+  activeSceneIndex: 0,
+  clockSeconds: false,
+};
+
+/* Board state: 2D array of tokens */
+let currentGrid = [];
+/* Target grid: what we're animating towards (used by live scenes to avoid re-triggering) */
+let targetGrid = null;
+/* Cell DOM references: 2D array of { element, upper, lower, flap, flapFront, flapBack, shadow, hinge } */
+let cellRefs = [];
+/* Animation state per cell */
+const activeFlips = new Map();
+let animLoopRunning = false;
+/* Pending stagger timeouts — cleared when a new applyGrid is called */
+let pendingFlipTimeouts = [];
+/* Audio */
+let audioCtx = null;
+let audioUnlocked = false;
+/* Auto-rotate */
+let autoRotateTimer = null;
+let autoRotateIndex = 0;
+let autoRotatePaused = false;
+/* Scene editor state */
+let editingSceneIndex = -1;
+/* Reduced motion */
+const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+/* Debounce timer for board rebuild */
+let rebuildTimer = null;
+
+/* ══════════════════════════════════════════
+   BUILT-IN SCENES
+   ══════════════════════════════════════════ */
+const DEFAULT_SCENES = [
+  {
+    name: 'Welcome',
+    lines: ['', '', 'WELCOME HOME', '', '', ''],
+    align: 'center'
+  },
+  {
+    name: 'Departure',
+    lines: ['', 'PLATFORM 5', 'NEXT:  08:45', 'DESTINATION: CENTRAL', '', '{check} ON TIME'],
+    align: 'center'
+  },
+  {
+    name: 'Delayed',
+    lines: ['', '', '{triangle} DELAYED {triangle}', 'PLEASE STAND BY', '', ''],
+    align: 'center'
+  },
+  {
+    name: 'Pattern',
+    generator: true
+  },
+  {
+    name: 'Route Map',
+    lines: ['', '  A {arrow} B {arrow} C {arrow} D', '  12   15   18   21', '', '{diamond} EXPRESS SERVICE {diamond}', ''],
+    align: 'center'
+  },
+  {
+    name: 'Celebration',
+    lines: ['', '{star} {heart} {star} {heart} {star} {heart} {star}', '   HELLO  WORLD   ', '{heart} {star} {heart} {star} {heart} {star} {heart}', '', ''],
+    align: 'center'
+  },
+  {
+    name: 'Date/Time',
+    generator: 'datetime',
+    live: true
+  },
+  {
+    name: 'Weather',
+    generator: 'weather',
+    live: true
+  },
+  {
+    name: 'Market',
+    generator: 'market',
+    live: true
+  }
+];
+
+let scenes = DEFAULT_SCENES.map(s => ({ ...s }));
+
+/* ══════════════════════════════════════════
+   DATA MODEL
+   ══════════════════════════════════════════ */
+function blankToken() {
+  return { type: 'char', value: ' ' };
+}
+
+function charToken(ch) {
+  return { type: 'char', value: (ch || ' ').toUpperCase() };
+}
+
+function shapeToken(name, style, accent) {
+  return { type: 'shape', value: name, style: style || 'filled', accent: accent || null };
+}
+
+function tokensEqual(a, b) {
+  if (!a && !b) return true;
+  if (!a || !b) return false;
+  if (a.type !== b.type) return false;
+  if (a.type === 'char') return a.value === b.value;
+  if (a.type === 'shape') return a.value === b.value && a.style === b.style && a.accent === b.accent;
+  return false;
+}
+
+/* Parse a text line into a flat array of tokens */
+function parseLine(line) {
+  const tokens = [];
+  let i = 0;
+  while (i < line.length) {
+    if (line[i] === '{') {
+      const end = line.indexOf('}', i);
+      if (end !== -1) {
+        const inside = line.substring(i + 1, end);
+        const parts = inside.split(':');
+        const name = parts[0].trim().toLowerCase();
+        if (SHAPE_NAMES.includes(name)) {
+          tokens.push(shapeToken(name, parts[1] || 'filled', parts[2] || null));
+          i = end + 1;
+          continue;
+        }
+      }
+    }
+    tokens.push(charToken(line[i]));
+    i++;
+  }
+  return tokens;
+}
+
+/* Convert scene definition to a 2D token grid */
+function sceneToTokens(scene, rows, cols) {
+  const grid = Array.from({ length: rows }, () =>
+    Array.from({ length: cols }, () => blankToken())
+  );
+
+  if (scene.generator) {
+    switch (scene.generator) {
+      case 'datetime': return generateDateTimeScene(rows, cols);
+      case 'weather':  return generateWeatherScene(rows, cols);
+      case 'market':   return generateMarketScene(rows, cols);
+      default:         return generatePatternGrid(rows, cols);
+    }
+  }
+
+  const lines = scene.lines || [];
+  for (let r = 0; r < Math.min(lines.length, rows); r++) {
+    const lineTokens = parseLine(lines[r] || '');
+    let offset = 0;
+    if (scene.align === 'center') {
+      offset = Math.max(0, Math.floor((cols - lineTokens.length) / 2));
+    }
+    for (let c = 0; c < lineTokens.length; c++) {
+      const col = c + offset;
+      if (col >= 0 && col < cols) {
+        grid[r][col] = lineTokens[c];
+      }
+    }
+  }
+  return grid;
+}
+
+/* Generate the checkerboard pattern scene */
+function generatePatternGrid(rows, cols) {
+  const grid = [];
+  const accent = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#f0a030';
+  for (let r = 0; r < rows; r++) {
+    const row = [];
+    for (let c = 0; c < cols; c++) {
+      const isEven = (r + c) % 2 === 0;
+      row.push(isEven
+        ? shapeToken('square', 'filled', accent)
+        : shapeToken('circle', 'outline', accent)
+      );
+    }
+    grid.push(row);
+  }
+  return grid;
+}
+
+/* ══════════════════════════════════════════
+   LIVE SCENE: DATE / TIME
+   ══════════════════════════════════════════ */
+function generateDateTimeScene(rows, cols) {
+  const now = new Date();
+  const days = ['SUNDAY','MONDAY','TUESDAY','WEDNESDAY','THURSDAY','FRIDAY','SATURDAY'];
+  const months = ['JANUARY','FEBRUARY','MARCH','APRIL','MAY','JUNE',
+                  'JULY','AUGUST','SEPTEMBER','OCTOBER','NOVEMBER','DECEMBER'];
+
+  const h = String(now.getHours()).padStart(2, '0');
+  const m = String(now.getMinutes()).padStart(2, '0');
+  const time = settings.clockSeconds
+    ? `${h}:${m}:${String(now.getSeconds()).padStart(2, '0')}`
+    : `${h}:${m}`;
+
+  const lines = [
+    '',
+    `${days[now.getDay()]}`,
+    `${months[now.getMonth()]} ${now.getDate()}, ${now.getFullYear()}`,
+    '',
+    time,
+    ''
+  ];
+  return linesToGrid(lines, rows, cols, 'center');
+}
+
+/* ══════════════════════════════════════════
+   LIVE SCENE: WEATHER
+   ══════════════════════════════════════════ */
+let weatherData = null;
+let weatherCity = '';
+let weatherFetchedAt = 0;
+let weatherFetching = false;
+
+function fetchWeather() {
+  if (weatherFetching) return;
+  weatherFetching = true;
+  if (!navigator.geolocation) {
+    weatherData = { error: 'NO GEOLOCATION' };
+    weatherFetching = false;
+    console.log('[weather] no geolocation support');
+    return;
+  }
+  console.log('[weather] requesting location...');
+  navigator.geolocation.getCurrentPosition(
+    (pos) => {
+      const { latitude, longitude } = pos.coords;
+      console.log(`[weather] got location: ${latitude.toFixed(2)}, ${longitude.toFixed(2)}`);
+      /* Reverse geocode for city name */
+      fetch(`https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json`)
+        .then(r => r.json())
+        .then(geo => {
+          weatherCity = (geo.address.city || geo.address.town || geo.address.village || '').toUpperCase();
+          console.log(`[weather] city: ${weatherCity}`);
+        })
+        .catch((e) => { console.log('[weather] geocode failed:', e); });
+      /* Fetch weather from Open-Meteo */
+      fetch(`https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m&temperature_unit=fahrenheit&wind_speed_unit=mph`)
+        .then(r => r.json())
+        .then(data => {
+          weatherData = data.current;
+          weatherFetchedAt = Date.now();
+          weatherFetching = false;
+          console.log('[weather] data received:', weatherData);
+        })
+        .catch((e) => { weatherData = { error: 'FETCH FAILED' }; weatherFetching = false; console.log('[weather] fetch failed:', e); });
+    },
+    (err) => { weatherData = { error: 'LOCATION DENIED' }; weatherFetching = false; console.log('[weather] location denied:', err); }
+  );
+}
+
+function weatherCodeToText(code) {
+  if (code === 0) return 'CLEAR SKY';
+  if (code <= 3) return 'PARTLY CLOUDY';
+  if (code <= 49) return 'FOG';
+  if (code <= 59) return 'DRIZZLE';
+  if (code <= 69) return 'RAIN';
+  if (code <= 79) return 'SNOW';
+  if (code <= 82) return 'RAIN SHOWERS';
+  if (code <= 86) return 'SNOW SHOWERS';
+  if (code >= 95) return 'THUNDERSTORM';
+  return 'UNKNOWN';
+}
+
+function generateWeatherScene(rows, cols) {
+  if (!weatherData) {
+    fetchWeather();
+    return linesToGrid(['', '', 'LOADING WEATHER...', '', '', ''], rows, cols, 'center');
+  }
+  if (weatherData.error) {
+    return linesToGrid(['', '', weatherData.error, '', '', ''], rows, cols, 'center');
+  }
+  /* Refresh every 5 minutes */
+  if (Date.now() - weatherFetchedAt > 300000) fetchWeather();
+
+  const temp = Math.round(weatherData.temperature_2m);
+  const humidity = weatherData.relative_humidity_2m;
+  const wind = Math.round(weatherData.wind_speed_10m);
+  const condition = weatherCodeToText(weatherData.weather_code);
+
+  const lines = [
+    weatherCity || 'CURRENT WEATHER',
+    '',
+    `${condition}`,
+    `TEMP: ${temp}F   HUMIDITY: ${humidity}`,
+    `WIND: ${wind} MPH`,
+    ''
+  ];
+  return linesToGrid(lines, rows, cols, 'center');
+}
+
+/* ══════════════════════════════════════════
+   LIVE SCENE: MARKET
+   ══════════════════════════════════════════ */
+let marketData = null;
+let marketFetchedAt = 0;
+let marketFetching = false;
+
+function fetchMarket() {
+  if (marketFetching) return;
+  marketFetching = true;
+  const symbols = ['^GSPC', '^DJI', '^IXIC'];
+  const url = `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${symbols.join(',')}`;
+  console.log('[market] fetching from Yahoo Finance...');
+
+  fetch(url)
+    .then(r => r.json())
+    .then(data => {
+      const quotes = data.quoteResponse.result;
+      marketData = quotes.map(q => ({
+        symbol: q.symbol.replace('^', ''),
+        name: q.shortName || q.symbol,
+        price: q.regularMarketPrice,
+        change: q.regularMarketChangePercent
+      }));
+      marketFetchedAt = Date.now();
+      marketFetching = false;
+      console.log('[market] Yahoo data received:', marketData);
+    })
+    .catch((e) => {
+      console.log('[market] Yahoo failed, trying fallback:', e);
+      fetchMarketFallback();
+    });
+}
+
+function fetchMarketFallback() {
+  /* Fallback: use Alpha Vantage demo endpoint for a single quote */
+  console.log('[market] trying Alpha Vantage fallback...');
+  fetch('https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=SPY&apikey=demo')
+    .then(r => r.json())
+    .then(data => {
+      const q = data['Global Quote'];
+      if (q && q['05. price']) {
+        marketData = [{
+          symbol: 'SPY',
+          name: 'S/P 500 ETF',
+          price: parseFloat(q['05. price']),
+          change: parseFloat(q['10. change percent'])
+        }];
+        marketFetchedAt = Date.now();
+        console.log('[market] Alpha Vantage data received:', marketData);
+      } else {
+        marketData = { error: true };
+        console.log('[market] Alpha Vantage returned no data:', data);
+      }
+      marketFetching = false;
+    })
+    .catch((e) => { marketData = { error: true }; marketFetching = false; console.log('[market] Alpha Vantage failed:', e); });
+}
+
+function generateMarketScene(rows, cols) {
+  if (!marketData) {
+    fetchMarket();
+    return linesToGrid(['', '', 'LOADING MARKET...', '', '', ''], rows, cols, 'center');
+  }
+  if (marketData.error) {
+    return linesToGrid(['', '', 'MARKET DATA UNAVAILABLE', 'CORS RESTRICTION', '', ''], rows, cols, 'center');
+  }
+  /* Refresh every 2 minutes */
+  if (Date.now() - marketFetchedAt > 120000) fetchMarket();
+
+  const lines = ['MARKET'];
+  for (const q of marketData) {
+    const dir = q.change >= 0 ? '+' : '';
+    const price = q.price.toFixed(2);
+    const pct = `${dir}${q.change.toFixed(2)}`;
+    lines.push(`${q.symbol}  ${price}  ${pct}`);
+  }
+  while (lines.length < 6) lines.push('');
+  return linesToGrid(lines, rows, cols, 'center');
+}
+
+/* ══════════════════════════════════════════
+   HELPER: lines array to token grid
+   ══════════════════════════════════════════ */
+function linesToGrid(lines, rows, cols, align) {
+  const grid = Array.from({ length: rows }, () =>
+    Array.from({ length: cols }, () => blankToken())
+  );
+  /* Vertically center if fewer lines than rows */
+  const vOffset = Math.max(0, Math.floor((rows - lines.length) / 2));
+  for (let r = 0; r < Math.min(lines.length, rows); r++) {
+    const row = r + vOffset;
+    if (row >= rows) break;
+    const lineTokens = parseLine(lines[r] || '');
+    let offset = 0;
+    if (align === 'center') {
+      offset = Math.max(0, Math.floor((cols - lineTokens.length) / 2));
+    }
+    for (let c = 0; c < lineTokens.length; c++) {
+      const col = c + offset;
+      if (col >= 0 && col < cols) {
+        grid[row][col] = lineTokens[c];
+      }
+    }
+  }
+  return grid;
+}
+
+/* ══════════════════════════════════════════
+   LIVE SCENE UPDATE TIMER
+   ══════════════════════════════════════════ */
+let liveTimer = null;
+
+function startLiveUpdates() {
+  stopLiveUpdates();
+  const tick = () => {
+    const all = getAllScenes();
+    const active = all[settings.activeSceneIndex];
+    if (active && active.live) {
+      const newGrid = sceneToTokens(active, settings.rows, settings.cols);
+      /* Compare against what we're already animating towards, not what's mid-flip */
+      const compareGrid = targetGrid || currentGrid;
+      const { rows, cols } = settings;
+      const changes = diffTokens(compareGrid, newGrid, rows, cols);
+      if (changes.length > 0) {
+        console.log(`[live] ${active.generator}: ${changes.length} cells changed`);
+        applyGrid(newGrid);
+      }
+    }
+  };
+  liveTimer = setInterval(tick, 1000);
+}
+
+function stopLiveUpdates() {
+  if (liveTimer) {
+    clearInterval(liveTimer);
+    liveTimer = null;
+  }
+}
+
+/* Compute diff between two grids */
+function diffTokens(oldGrid, newGrid, rows, cols) {
+  const changes = [];
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const oldT = (oldGrid[r] && oldGrid[r][c]) || blankToken();
+      const newT = (newGrid[r] && newGrid[r][c]) || blankToken();
+      if (!tokensEqual(oldT, newT)) {
+        changes.push({ row: r, col: c, from: oldT, to: newT });
+      }
+    }
+  }
+  return changes;
+}
+
+/* ══════════════════════════════════════════
+   SOUND ENGINE
+   ══════════════════════════════════════════ */
+function initAudio() {
+  if (audioCtx) return;
+  try {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    audioUnlocked = true;
+  } catch (e) {
+    console.warn('WebAudio not available');
+  }
+}
+
+function playClack(volume) {
+  if (!audioCtx || !audioUnlocked || settings.muted || prefersReducedMotion) return;
+  const vol = (volume != null ? volume : settings.volume) / 100;
+  if (vol <= 0) return;
+
+  const now = audioCtx.currentTime;
+  const rate = audioCtx.sampleRate;
+
+  /* Configurable parameters (0–100 range) */
+  const tone = settings.soundTone / 100;   /* 0 = dark/warm, 1 = bright */
+  const snap = settings.soundSnap / 100;   /* 0 = no snap, 1 = hard click */
+  const body = settings.soundBody / 100;   /* 0 = no resonance, 1 = heavy */
+
+  /*
+   * Split-flap flutter: a thin flap of plastic/metal rotating through air
+   * and landing against the next stop. The cascading waterfall comes from
+   * many of these overlapping with stagger.
+   */
+
+  /* Layer 1: Flutter — longer, softer noise shaped by tone */
+  const flutterDur = 0.025 + (1 - tone) * 0.015; /* darker = longer, breathier */
+  const flutterLen = Math.floor(rate * flutterDur);
+  const flutterBuf = audioCtx.createBuffer(1, flutterLen, rate);
+  const flutterData = flutterBuf.getChannelData(0);
+  for (let i = 0; i < flutterLen; i++) {
+    /* Soft attack, gentle decay */
+    const t = i / flutterLen;
+    const env = Math.sin(t * Math.PI) * Math.pow(1 - t, 1.5);
+    flutterData[i] = (Math.random() * 2 - 1) * env;
+  }
+  const flutterSrc = audioCtx.createBufferSource();
+  flutterSrc.buffer = flutterBuf;
+
+  /* Tone controls the filter center — low tone = warm rumble, high = airy hiss */
+  const hpFreq = 400 + tone * 1400;
+  const bpFreq = 1200 + tone * 3000 + Math.random() * 800;
+
+  const hp = audioCtx.createBiquadFilter();
+  hp.type = 'highpass';
+  hp.frequency.value = hpFreq;
+  hp.Q.value = 0.3;
+
+  const bp = audioCtx.createBiquadFilter();
+  bp.type = 'bandpass';
+  bp.frequency.value = bpFreq;
+  bp.Q.value = 0.3 + tone * 0.4;
+
+  const flutterGain = audioCtx.createGain();
+  flutterGain.gain.setValueAtTime(vol * 0.18, now);
+  flutterGain.gain.exponentialRampToValueAtTime(0.001, now + flutterDur + 0.005);
+
+  flutterSrc.connect(hp);
+  hp.connect(bp);
+  bp.connect(flutterGain);
+  flutterGain.connect(audioCtx.destination);
+  flutterSrc.start(now);
+  flutterSrc.stop(now + flutterDur + 0.01);
+
+  /* Layer 2: Snap — the flap hitting the stop. Controlled by snap parameter. */
+  if (snap > 0.05) {
+    const snapDur = 0.004 + snap * 0.008;
+    const snapLen = Math.floor(rate * snapDur);
+    const snapBuf = audioCtx.createBuffer(1, snapLen, rate);
+    const snapData = snapBuf.getChannelData(0);
+    for (let i = 0; i < snapLen; i++) {
+      snapData[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / snapLen, 3 + snap * 5);
+    }
+    const snapSrc = audioCtx.createBufferSource();
+    snapSrc.buffer = snapBuf;
+
+    const snapBp = audioCtx.createBiquadFilter();
+    snapBp.type = 'bandpass';
+    snapBp.frequency.value = 800 + tone * 2000 + Math.random() * 600;
+    snapBp.Q.value = 0.6 + snap * 1.5;
+
+    const snapGainNode = audioCtx.createGain();
+    const snapVol = vol * snap * 0.15;
+    snapGainNode.gain.setValueAtTime(snapVol, now);
+    snapGainNode.gain.exponentialRampToValueAtTime(0.001, now + snapDur + 0.003);
+
+    snapSrc.connect(snapBp);
+    snapBp.connect(snapGainNode);
+    snapGainNode.connect(audioCtx.destination);
+    snapSrc.start(now);
+    snapSrc.stop(now + snapDur + 0.005);
+  }
+
+  /* Layer 3: Body resonance — the housing vibrating. Controlled by body parameter. */
+  if (body > 0.05) {
+    const bodyOsc = audioCtx.createOscillator();
+    bodyOsc.type = 'sine';
+    bodyOsc.frequency.value = 60 + body * 80 + Math.random() * 30;
+    const bodyDur = 0.02 + body * 0.04;
+
+    const bodyGainNode = audioCtx.createGain();
+    const bodyVol = vol * body * 0.06;
+    bodyGainNode.gain.setValueAtTime(bodyVol, now);
+    bodyGainNode.gain.exponentialRampToValueAtTime(0.001, now + bodyDur);
+
+    bodyOsc.connect(bodyGainNode);
+    bodyGainNode.connect(audioCtx.destination);
+    bodyOsc.start(now);
+    bodyOsc.stop(now + bodyDur + 0.005);
+  }
+}
+
+/* ══════════════════════════════════════════
+   RENDERER — Cell DOM creation & content
+   ══════════════════════════════════════════ */
+function renderTokenHTML(token) {
+  if (!token || (token.type === 'char' && token.value === ' ')) {
+    return '<span class="char-display">&nbsp;</span>';
+  }
+  if (token.type === 'char') {
+    const escaped = token.value.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    return `<span class="char-display">${escaped}</span>`;
+  }
+  if (token.type === 'shape') {
+    return getShapeSVG(token.value, token.style || 'filled', token.accent);
+  }
+  return '<span class="char-display">&nbsp;</span>';
+}
+
+function createBoardDOM() {
+  const grid = document.getElementById('boardGrid');
+  grid.innerHTML = '';
+  cellRefs = [];
+
+  const { rows, cols, cellSize } = settings;
+  const cellH = Math.round(cellSize * 1.42);
+  const fontSize = Math.round(cellSize * 0.62);
+  const shapeSize = Math.round(cellSize * 0.58);
+
+  grid.style.gridTemplateColumns = `repeat(${cols}, ${cellSize}px)`;
+  grid.style.gridTemplateRows = `repeat(${rows}, ${cellH}px)`;
+  document.documentElement.style.setProperty('--cell-w', cellSize + 'px');
+  document.documentElement.style.setProperty('--cell-h', cellH + 'px');
+
+  for (let r = 0; r < rows; r++) {
+    cellRefs[r] = [];
+    for (let c = 0; c < cols; c++) {
+      const cell = document.createElement('div');
+      cell.className = 'sf-cell';
+      cell.style.width = cellSize + 'px';
+      cell.style.height = cellH + 'px';
+
+      cell.innerHTML = `
+        <div class="cell-inner">
+          <div class="cell-upper"><div class="cell-content" style="font-size:${fontSize}px"></div></div>
+          <div class="cell-lower"><div class="cell-content" style="font-size:${fontSize}px"></div></div>
+          <div class="cell-flap">
+            <div class="flap-face flap-front"><div class="cell-content" style="font-size:${fontSize}px"></div></div>
+            <div class="flap-face flap-back"><div class="cell-content" style="font-size:${fontSize}px"></div></div>
+          </div>
+          <div class="cell-flap-shadow"></div>
+          <div class="cell-hinge"></div>
+          <div class="cell-dust"></div>
+        </div>`;
+
+      grid.appendChild(cell);
+
+      const inner = cell.querySelector('.cell-inner');
+      const ref = {
+        element: cell,
+        inner: inner,
+        upper: inner.querySelector('.cell-upper .cell-content'),
+        lower: inner.querySelector('.cell-lower .cell-content'),
+        flap: inner.querySelector('.cell-flap'),
+        flapFront: inner.querySelector('.flap-front .cell-content'),
+        flapBack: inner.querySelector('.flap-back .cell-content'),
+        shadow: inner.querySelector('.cell-flap-shadow'),
+        dust: inner.querySelector('.cell-dust'),
+      };
+
+      /* Set shape SVG sizing */
+      const sizeStyle = `width:${shapeSize}px;height:${shapeSize}px;`;
+      [ref.upper, ref.lower, ref.flapFront, ref.flapBack].forEach(el => {
+        el.dataset.shapeStyle = sizeStyle;
+      });
+
+      cellRefs[r][c] = ref;
+    }
+  }
+
+  /* Initialize dust overlay with random seeds */
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const dust = cellRefs[r][c].dust;
+      dust.style.opacity = (0.01 + Math.random() * 0.025).toFixed(3);
+      dust.style.backgroundPosition = `${Math.random()*64|0}px ${Math.random()*64|0}px`;
+    }
+  }
+}
+
+function setCellContent(contentEl, token) {
+  const html = renderTokenHTML(token);
+  contentEl.innerHTML = html;
+  /* Apply shape sizing */
+  const svg = contentEl.querySelector('.shape-svg');
+  if (svg && contentEl.dataset.shapeStyle) {
+    svg.setAttribute('style', contentEl.dataset.shapeStyle);
+  }
+}
+
+function setStaticCell(row, col, token) {
+  const ref = cellRefs[row][col];
+  setCellContent(ref.upper, token);
+  setCellContent(ref.lower, token);
+  ref.flap.style.display = 'none';
+  ref.shadow.style.opacity = '0';
+}
+
+/* ══════════════════════════════════════════
+   ANIMATION ENGINE
+   ══════════════════════════════════════════ */
+function easeInOutQuad(t) {
+  return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+}
+
+/* Slight bounce at the end for mechanical settle feel */
+function flapEase(t) {
+  if (t < 0.7) {
+    /* Accelerate then decelerate */
+    const t2 = t / 0.7;
+    return t2 < 0.5 ? 2 * t2 * t2 * 0.7 : (1 - Math.pow(-2 * t2 + 2, 2) / 2) * 0.7;
+  }
+  /* Slight overshoot and settle */
+  const t3 = (t - 0.7) / 0.3;
+  return 0.7 + 0.3 * (1 + Math.sin(t3 * Math.PI * 1.2 - Math.PI / 2) * 0.04 * (1 - t3)) * t3;
+}
+
+function startAnimationLoop() {
+  if (animLoopRunning) return;
+  animLoopRunning = true;
+  requestAnimationFrame(animationTick);
+}
+
+function animationTick(timestamp) {
+  if (activeFlips.size === 0) {
+    animLoopRunning = false;
+    return;
+  }
+
+  for (const [key, state] of activeFlips) {
+    updateFlip(key, state, timestamp);
+  }
+
+  requestAnimationFrame(animationTick);
+}
+
+function updateFlip(key, state, timestamp) {
+  if (!state.startTime) {
+    state.startTime = timestamp;
+  }
+  const elapsed = timestamp - state.startTime;
+  const progress = Math.min(elapsed / state.duration, 1);
+  const eased = flapEase(progress);
+  const angle = eased * -180;
+
+  const ref = state.ref;
+  ref.flap.style.transform = `rotateX(${angle}deg)`;
+
+  /* Dynamic shadow under flap — grows as flap lifts, shrinks as it settles */
+  const shadowOpacity = Math.sin(progress * Math.PI) * 0.6;
+  ref.shadow.style.opacity = shadowOpacity.toFixed(3);
+  /* Shift shadow down slightly based on flap angle for depth */
+  const shadowShift = Math.sin(progress * Math.PI) * 4;
+  ref.shadow.style.transform = `translateY(${shadowShift.toFixed(1)}px)`;
+
+  /* At midpoint: update static upper to new char, play sound */
+  if (progress >= 0.5 && !state.midpointDone) {
+    state.midpointDone = true;
+    setCellContent(ref.upper, state.nextToken);
+    /* Throttle sound: allow more through for the cascading waterfall effect */
+    const soundProb = Math.max(0.15, Math.min(1, 20 / Math.max(1, activeFlips.size)));
+    if (Math.random() < soundProb) {
+      playClack();
+    }
+  }
+
+  /* Complete this flip */
+  if (progress >= 1) {
+    setCellContent(ref.lower, state.nextToken);
+    ref.flap.style.display = 'none';
+    ref.flap.style.transform = '';
+    ref.shadow.style.opacity = '0';
+    ref.shadow.style.transform = '';
+
+    /* Tiny settle imperfection — slight misalignment */
+    const settle = (Math.random() - 0.5) * 0.5;
+    const vsettle = (Math.random() - 0.5) * 0.3;
+    ref.inner.style.transform = `rotate(${settle.toFixed(2)}deg) translateY(${vsettle.toFixed(2)}px)`;
+
+    /* More flips in queue? Intermediate flips are faster than the final settle. */
+    if (state.queue.length > 0) {
+      const next = state.queue.shift();
+      const isLast = state.queue.length === 0;
+      const nextDur = isLast ? state.duration : state.duration * 0.45;
+      beginSingleFlip(key, state.ref, state.row, state.col, state.nextToken, next, state.queue, nextDur);
+    } else {
+      /* Final — update currentGrid */
+      currentGrid[state.row][state.col] = state.nextToken;
+      activeFlips.delete(key);
+    }
+  }
+}
+
+function beginSingleFlip(key, ref, row, col, fromToken, toToken, queue, duration) {
+  /* Setup flap faces */
+  setCellContent(ref.flapFront, fromToken);
+  setCellContent(ref.flapBack, toToken);
+
+  ref.flap.style.display = '';
+  ref.flap.style.transform = 'rotateX(0deg)';
+
+  activeFlips.set(key, {
+    ref,
+    row,
+    col,
+    fromToken,
+    nextToken: toToken,
+    queue,
+    duration,
+    startTime: null,
+    midpointDone: false,
+  });
+}
+
+/* Generate intermediate "cycling" tokens — realistic drum rotation.
+   In a real split-flap display, the drum rotates forward through the
+   character set. Each intermediate character is briefly visible.
+   We simulate this by stepping through the charset in order. */
+function generateFlipQueue(from, to, extraFlips) {
+  const queue = [];
+
+  if (from.type === 'char' && to.type === 'char') {
+    const fromIdx = CHAR_SET.indexOf(from.value);
+    const toIdx = CHAR_SET.indexOf(to.value);
+
+    if (fromIdx >= 0 && toIdx >= 0 && fromIdx !== toIdx) {
+      /* Calculate forward distance (drum only spins one direction) */
+      const forwardDist = toIdx > fromIdx
+        ? toIdx - fromIdx
+        : CHAR_SET.length - fromIdx + toIdx;
+
+      /* Determine how many intermediate flaps to show.
+         Real drums show every character; we show a subset for speed. */
+      const maxIntermediates = Math.min(forwardDist - 1, extraFlips + 2 + Math.floor(Math.random() * 2));
+
+      if (maxIntermediates > 0 && forwardDist > 1) {
+        /* Step through the character set evenly */
+        const stepSize = Math.max(1, Math.floor(forwardDist / (maxIntermediates + 1)));
+        let idx = fromIdx;
+        for (let i = 0; i < maxIntermediates; i++) {
+          idx = (idx + stepSize) % CHAR_SET.length;
+          /* Don't include the target in intermediates */
+          if (idx !== toIdx) {
+            queue.push(charToken(CHAR_SET[idx]));
+          }
+        }
+      }
+    }
+  } else {
+    /* For shapes or mixed types, cycle through random shapes/chars */
+    const count = extraFlips + Math.floor(Math.random() * 2);
+    for (let i = 0; i < count; i++) {
+      if (to.type === 'shape') {
+        const rndShape = SHAPE_NAMES[Math.floor(Math.random() * SHAPE_NAMES.length)];
+        queue.push(shapeToken(rndShape, to.style || 'filled', to.accent));
+      } else {
+        const rndIdx = Math.floor(Math.random() * CHAR_SET.length);
+        queue.push(charToken(CHAR_SET[rndIdx]));
+      }
+    }
+  }
+
+  queue.push(to); // final target is always last
+  return queue;
+}
+
+/* Main entry: apply a new grid with full animation */
+function applyGrid(newGrid, immediate) {
+  const { rows, cols, flipSpeed, stagger, jitter, extraFlips } = settings;
+
+  /* Ensure grids match dimensions */
+  while (currentGrid.length < rows) currentGrid.push(Array.from({ length: cols }, () => blankToken()));
+  while (newGrid.length < rows) newGrid.push(Array.from({ length: cols }, () => blankToken()));
+  for (let r = 0; r < rows; r++) {
+    while ((currentGrid[r] || []).length < cols) (currentGrid[r] = currentGrid[r] || []).push(blankToken());
+    while ((newGrid[r] || []).length < cols) (newGrid[r] = newGrid[r] || []).push(blankToken());
+  }
+
+  /* Store the target grid so live scenes can compare against it */
+  targetGrid = newGrid;
+
+  const changes = diffTokens(currentGrid, newGrid, rows, cols);
+
+  if (immediate || prefersReducedMotion) {
+    /* Instant update — no animation */
+    for (const ch of changes) {
+      setStaticCell(ch.row, ch.col, ch.to);
+      currentGrid[ch.row][ch.col] = ch.to;
+    }
+    return;
+  }
+
+  if (changes.length === 0) return;
+
+  /* Cancel any pending stagger timeouts from previous applyGrid */
+  for (const tid of pendingFlipTimeouts) clearTimeout(tid);
+  pendingFlipTimeouts = [];
+
+  /* Schedule flips with stagger + jitter */
+  const dir = settings.flipDirection;
+  const midR = (rows - 1) / 2;
+  const midC = (cols - 1) / 2;
+
+  for (const ch of changes) {
+    const key = `${ch.row}-${ch.col}`;
+    /* Cancel any existing flip on this cell — jump to final target */
+    if (activeFlips.has(key)) {
+      const existing = activeFlips.get(key);
+      const finalToken = existing.queue.length > 0
+        ? existing.queue[existing.queue.length - 1]
+        : existing.nextToken;
+      setStaticCell(ch.row, ch.col, finalToken);
+      currentGrid[ch.row][ch.col] = finalToken;
+      activeFlips.delete(key);
+    }
+
+    let t;
+    switch (dir) {
+      case 'left':        t = (cols - 1 - ch.col) + ch.row * 0.35; break;
+      case 'down':        t = ch.row + ch.col * 0.35; break;
+      case 'up':          t = (rows - 1 - ch.row) + ch.col * 0.35; break;
+      case 'diagonal-br': t = ch.row + ch.col; break;
+      case 'diagonal-bl': t = ch.row + (cols - 1 - ch.col); break;
+      case 'diagonal-tr': t = (rows - 1 - ch.row) + ch.col; break;
+      case 'diagonal-tl': t = (rows - 1 - ch.row) + (cols - 1 - ch.col); break;
+      case 'center':      t = Math.sqrt((ch.row - midR) ** 2 + (ch.col - midC) ** 2); break;
+      case 'random':      t = Math.random() * Math.max(rows, cols); break;
+      default:            t = ch.col + ch.row * 0.35; break; /* right */
+    }
+    const delay = t * stagger + (Math.random() * jitter);
+
+    const queue = generateFlipQueue(ch.from, ch.to, extraFlips);
+    const firstTarget = queue.shift();
+    const ref = cellRefs[ch.row][ch.col];
+    const dur = flipSpeed + (Math.random() - 0.5) * flipSpeed * 0.2; // slight variation
+
+    const tid = setTimeout(() => {
+      /* Reset settle transform */
+      ref.inner.style.transform = '';
+      beginSingleFlip(key, ref, ch.row, ch.col, ch.from, firstTarget, queue, dur);
+      startAnimationLoop();
+    }, delay);
+    pendingFlipTimeouts.push(tid);
+  }
+}
+
+/* ══════════════════════════════════════════
+   SCENE APPLICATION
+   ══════════════════════════════════════════ */
+function getAllScenes() {
+  return scenes;
+}
+
+function applyScene(scene, immediate) {
+  const grid = sceneToTokens(scene, settings.rows, settings.cols);
+  applyGrid(grid, immediate);
+}
+
+function applySceneByIndex(index, immediate) {
+  const all = getAllScenes();
+  if (index >= 0 && index < all.length) {
+    settings.activeSceneIndex = index;
+    applyScene(all[index], immediate);
+    saveSettings();
+    renderSceneList();
+    /* Start or stop live updates based on scene type */
+    if (all[index].live) {
+      startLiveUpdates();
+    } else {
+      stopLiveUpdates();
+    }
+  }
+}
+
+/* ══════════════════════════════════════════
+   BOARD SIZING — fills viewport
+   ══════════════════════════════════════════ */
+function autoSizeBoard() {
+  /* Calculate how many rows/cols fit the viewport at current cell size */
+  const cellW = settings.cellSize;
+  const cellH = Math.round(cellW * 1.42);
+  const gap = 3;
+  const hPad = 48;  // board-inner horizontal padding + board border
+  const vPad = 100;  // header + footer + vertical padding + border
+
+  const availW = window.innerWidth - hPad;
+  const availH = window.innerHeight - vPad;
+
+  settings.cols = Math.max(4, Math.floor(availW / (cellW + gap)));
+  settings.rows = Math.max(2, Math.floor(availH / (cellH + gap)));
+}
+
+function scaleBoard() {
+  const frame = document.getElementById('boardFrame');
+  const { rows, cols, cellSize } = settings;
+  const cellH = Math.round(cellSize * 1.42);
+  const gap = 3;
+  const boardW = cols * (cellSize + gap) + 44;
+  const boardH = rows * (cellH + gap) + 84;
+
+  const maxW = window.innerWidth - 8;
+  const maxH = window.innerHeight - 8;
+  const scale = Math.min(maxW / boardW, maxH / boardH);
+
+  frame.style.transform = `scale(${scale})`;
+}
+
+/* ══════════════════════════════════════════
+   CLOCK
+   ══════════════════════════════════════════ */
+function updateClock() {
+  const el = document.getElementById('headerClock');
+  const now = new Date();
+  const h = String(now.getHours()).padStart(2, '0');
+  const m = String(now.getMinutes()).padStart(2, '0');
+  const s = String(now.getSeconds()).padStart(2, '0');
+  el.textContent = `${h}:${m}:${s}`;
+}
+
+/* ══════════════════════════════════════════
+   AUTO-ROTATE
+   ══════════════════════════════════════════ */
+function startAutoRotate() {
+  stopAutoRotate();
+  if (!settings.autoRotate) return;
+  autoRotateIndex = settings.activeSceneIndex;
+  autoRotateTimer = setInterval(() => {
+    if (autoRotatePaused) return;
+    const all = getAllScenes();
+    autoRotateIndex = (autoRotateIndex + 1) % all.length;
+    applySceneByIndex(autoRotateIndex);
+  }, settings.autoRotateInterval * 1000);
+}
+
+function stopAutoRotate() {
+  if (autoRotateTimer) {
+    clearInterval(autoRotateTimer);
+    autoRotateTimer = null;
+  }
+}
+
+function pauseAutoRotateTemporarily() {
+  autoRotatePaused = true;
+  clearTimeout(window._autoResume);
+  window._autoResume = setTimeout(() => { autoRotatePaused = false; }, 5000);
+}
+
+/* ══════════════════════════════════════════
+   CONFIG UI
+   ══════════════════════════════════════════ */
+function openConfig() {
+  document.getElementById('configDrawer').classList.add('open');
+  document.getElementById('configOverlay').classList.add('active');
+  pauseAutoRotateTemporarily();
+}
+
+function closeConfig() {
+  document.getElementById('configDrawer').classList.remove('open');
+  document.getElementById('configOverlay').classList.remove('active');
+  closeEditor();
+}
+
+function closeEditor() {
+  document.getElementById('sceneEditor').classList.remove('active');
+  editingSceneIndex = -1;
+}
+
+/* Wire up all config controls */
+function setupConfigUI() {
+  document.getElementById('btnConfig').addEventListener('click', openConfig);
+  document.getElementById('configClose').addEventListener('click', closeConfig);
+  document.getElementById('configOverlay').addEventListener('click', closeConfig);
+
+  /* Sliders */
+  const sliders = [
+    { id: 'cfgRows', key: 'rows', valId: 'cfgRowsVal', fmt: v => v, rebuild: true },
+    { id: 'cfgCols', key: 'cols', valId: 'cfgColsVal', fmt: v => v, rebuild: true },
+    { id: 'cfgCellSize', key: 'cellSize', valId: 'cfgCellSizeVal', fmt: v => v, rebuild: true },
+    { id: 'cfgSpeed', key: 'flipSpeed', valId: 'cfgSpeedVal', fmt: v => v + 'ms' },
+    { id: 'cfgStagger', key: 'stagger', valId: 'cfgStaggerVal', fmt: v => v + 'ms' },
+    { id: 'cfgJitter', key: 'jitter', valId: 'cfgJitterVal', fmt: v => v + 'ms' },
+    { id: 'cfgExtraFlips', key: 'extraFlips', valId: 'cfgExtraFlipsVal', fmt: v => v },
+    { id: 'cfgVolume', key: 'volume', valId: 'cfgVolumeVal', fmt: v => v + '%' },
+    { id: 'cfgSoundTone', key: 'soundTone', valId: 'cfgSoundToneVal', fmt: v => v, sound: true },
+    { id: 'cfgSoundSnap', key: 'soundSnap', valId: 'cfgSoundSnapVal', fmt: v => v, sound: true },
+    { id: 'cfgSoundBody', key: 'soundBody', valId: 'cfgSoundBodyVal', fmt: v => v, sound: true },
+    { id: 'cfgAutoInterval', key: 'autoRotateInterval', valId: 'cfgAutoIntervalVal', fmt: v => v + 's' },
+  ];
+
+  sliders.forEach(({ id, key, valId, fmt, rebuild, sound }) => {
+    const input = document.getElementById(id);
+    const valEl = document.getElementById(valId);
+    input.value = settings[key];
+    valEl.textContent = fmt(settings[key]);
+
+    input.addEventListener('input', () => {
+      const v = parseInt(input.value);
+      settings[key] = v;
+      valEl.textContent = fmt(v);
+      saveSettings();
+
+      if (rebuild) {
+        clearTimeout(rebuildTimer);
+        rebuildTimer = setTimeout(rebuildBoard, 150);
+      }
+      if (key === 'autoRotateInterval' && settings.autoRotate) {
+        startAutoRotate();
+      }
+      if (sound) {
+        settings.soundPreset = 'custom';
+        document.getElementById('cfgSoundPreset').value = 'custom';
+        saveSettings();
+      }
+    });
+  });
+
+  /* Sound presets */
+  const SOUND_PRESETS = {
+    waterfall:  { soundTone: 30, soundSnap: 25, soundBody: 35 },
+    mechanical: { soundTone: 45, soundSnap: 75, soundBody: 60 },
+    soft:       { soundTone: 20, soundSnap: 10, soundBody: 15 },
+    crisp:      { soundTone: 75, soundSnap: 65, soundBody: 10 },
+    heavy:      { soundTone: 25, soundSnap: 90, soundBody: 85 },
+  };
+
+  function applySoundPreset(name) {
+    const preset = SOUND_PRESETS[name];
+    if (!preset) return;
+    settings.soundTone = preset.soundTone;
+    settings.soundSnap = preset.soundSnap;
+    settings.soundBody = preset.soundBody;
+    settings.soundPreset = name;
+    /* Update slider UI */
+    document.getElementById('cfgSoundTone').value = preset.soundTone;
+    document.getElementById('cfgSoundToneVal').textContent = preset.soundTone;
+    document.getElementById('cfgSoundSnap').value = preset.soundSnap;
+    document.getElementById('cfgSoundSnapVal').textContent = preset.soundSnap;
+    document.getElementById('cfgSoundBody').value = preset.soundBody;
+    document.getElementById('cfgSoundBodyVal').textContent = preset.soundBody;
+    saveSettings();
+  }
+
+  const presetSelect = document.getElementById('cfgSoundPreset');
+  presetSelect.value = settings.soundPreset;
+  presetSelect.addEventListener('change', () => {
+    if (presetSelect.value !== 'custom') {
+      applySoundPreset(presetSelect.value);
+    }
+  });
+
+  /* Test sound button */
+  document.getElementById('btnSoundTest').addEventListener('click', () => {
+    initAudio();
+    /* Fire a burst of flaps with stagger to preview the cascading effect */
+    for (let i = 0; i < 8; i++) {
+      setTimeout(() => playClack(), i * 30);
+    }
+  });
+
+  /* Flip direction select */
+  const dirSelect = document.getElementById('cfgFlipDirection');
+  dirSelect.value = settings.flipDirection;
+  dirSelect.addEventListener('change', () => {
+    settings.flipDirection = dirSelect.value;
+    saveSettings();
+  });
+
+  /* Clock seconds checkbox */
+  const csCheck = document.getElementById('cfgClockSeconds');
+  csCheck.checked = settings.clockSeconds;
+  csCheck.addEventListener('change', () => {
+    settings.clockSeconds = csCheck.checked;
+    saveSettings();
+    /* Restart live updates with the appropriate interval */
+    const all = getAllScenes();
+    const active = all[settings.activeSceneIndex];
+    if (active && active.live) {
+      startLiveUpdates();
+      applyScene(active);
+    }
+  });
+
+  /* Auto-rotate checkbox */
+  const arCheck = document.getElementById('cfgAutoRotate');
+  arCheck.checked = settings.autoRotate;
+  arCheck.addEventListener('change', () => {
+    settings.autoRotate = arCheck.checked;
+    saveSettings();
+    if (settings.autoRotate) startAutoRotate(); else stopAutoRotate();
+  });
+
+  /* Mute toggle */
+  document.getElementById('btnMute').addEventListener('click', () => {
+    initAudio();
+    settings.muted = !settings.muted;
+    updateMuteIcon();
+    saveSettings();
+  });
+
+  /* Theme swatches */
+  document.querySelectorAll('.theme-swatch').forEach(swatch => {
+    swatch.addEventListener('click', () => {
+      const theme = swatch.dataset.theme;
+      document.body.className = theme ? `theme-${theme}` : '';
+      settings.theme = theme;
+      document.querySelectorAll('.theme-swatch').forEach(s => s.classList.remove('active'));
+      swatch.classList.add('active');
+      saveSettings();
+    });
+  });
+
+  /* Scene editor: shape palette */
+  const palette = document.getElementById('shapePalette');
+  SHAPE_NAMES.forEach(name => {
+    const btn = document.createElement('button');
+    btn.className = 'shape-btn';
+    btn.title = name;
+    btn.innerHTML = getShapeSVG(name, 'filled', 'currentColor');
+    btn.addEventListener('click', () => {
+      const ta = document.getElementById('editorText');
+      const pos = ta.selectionStart;
+      const text = ta.value;
+      const insert = `{${name}}`;
+      ta.value = text.slice(0, pos) + insert + text.slice(pos);
+      ta.selectionStart = ta.selectionEnd = pos + insert.length;
+      ta.focus();
+    });
+    palette.appendChild(btn);
+  });
+
+  /* Add scene button */
+  document.getElementById('btnAddScene').addEventListener('click', () => {
+    editingSceneIndex = -1;
+    document.getElementById('editorTitle').textContent = 'New Scene';
+    document.getElementById('editorName').value = '';
+    document.getElementById('editorText').value = '';
+    document.getElementById('sceneEditor').classList.add('active');
+  });
+
+  /* Reset scenes to defaults */
+  document.getElementById('btnResetScenes').addEventListener('click', () => {
+    scenes = DEFAULT_SCENES.map(s => ({ ...s }));
+    settings.activeSceneIndex = 0;
+    saveSettings();
+    closeEditor();
+    renderSceneList();
+    applySceneByIndex(0);
+  });
+
+  /* Editor cancel */
+  document.getElementById('btnEditorCancel').addEventListener('click', closeEditor);
+
+  /* Editor preview */
+  document.getElementById('btnEditorPreview').addEventListener('click', () => {
+    const scene = getEditorScene();
+    if (scene) applyScene(scene);
+  });
+
+  /* Editor save */
+  document.getElementById('btnEditorSave').addEventListener('click', () => {
+    const scene = getEditorScene();
+    if (!scene) return;
+
+    if (editingSceneIndex >= 0 && editingSceneIndex < scenes.length) {
+      scenes[editingSceneIndex] = scene;
+    } else {
+      scenes.push(scene);
+      settings.activeSceneIndex = scenes.length - 1;
+    }
+
+    saveSettings();
+    renderSceneList();
+    closeEditor();
+    applyScene(scene);
+  });
+}
+
+function getEditorScene() {
+  const name = document.getElementById('editorName').value.trim() || 'Untitled';
+  const text = document.getElementById('editorText').value;
+  const lines = text.split('\n');
+  return { name, lines, align: 'center' };
+}
+
+function renderSceneList() {
+  const list = document.getElementById('sceneList');
+  list.innerHTML = '';
+  const all = getAllScenes();
+
+  all.forEach((scene, idx) => {
+    const item = document.createElement('div');
+    item.className = 'scene-item' + (idx === settings.activeSceneIndex ? ' active' : '');
+
+    const nameEl = document.createElement('span');
+    nameEl.className = 'scene-item-name';
+    nameEl.textContent = scene.name;
+    item.appendChild(nameEl);
+
+    const actions = document.createElement('div');
+    actions.className = 'scene-item-actions';
+
+    if (!scene.generator) {
+      const editBtn = document.createElement('button');
+      editBtn.className = 'scene-item-btn';
+      editBtn.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>';
+      editBtn.title = 'Edit';
+      editBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        editingSceneIndex = idx;
+        document.getElementById('editorTitle').textContent = 'Edit Scene';
+        document.getElementById('editorName').value = scene.name;
+        document.getElementById('editorText').value = (scene.lines || []).join('\n');
+        document.getElementById('sceneEditor').classList.add('active');
+      });
+      actions.appendChild(editBtn);
+    }
+
+    if (scenes.length > 1) {
+      const delBtn = document.createElement('button');
+      delBtn.className = 'scene-item-btn delete';
+      delBtn.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>';
+      delBtn.title = 'Delete';
+      delBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        scenes.splice(idx, 1);
+        if (settings.activeSceneIndex >= scenes.length) {
+          settings.activeSceneIndex = scenes.length - 1;
+        }
+        saveSettings();
+        renderSceneList();
+        applySceneByIndex(settings.activeSceneIndex);
+      });
+      actions.appendChild(delBtn);
+    }
+
+    item.appendChild(actions);
+
+    item.addEventListener('click', () => {
+      applySceneByIndex(idx);
+      pauseAutoRotateTemporarily();
+    });
+
+    list.appendChild(item);
+  });
+}
+
+function updateMuteIcon() {
+  const on = document.getElementById('iconSoundOn');
+  const off = document.getElementById('iconSoundOff');
+  const btn = document.getElementById('btnMute');
+  if (settings.muted) {
+    on.style.display = 'none';
+    off.style.display = '';
+    btn.classList.add('muted');
+  } else {
+    on.style.display = '';
+    off.style.display = 'none';
+    btn.classList.remove('muted');
+  }
+}
+
+/* ══════════════════════════════════════════
+   LOCAL STORAGE
+   ══════════════════════════════════════════ */
+function saveSettings() {
+  try {
+    localStorage.setItem('splitFlap_settings', JSON.stringify(settings));
+    localStorage.setItem('splitFlap_scenes', JSON.stringify(scenes));
+  } catch (e) { /* quota exceeded or unavailable */ }
+}
+
+function loadSettings() {
+  try {
+    const saved = localStorage.getItem('splitFlap_settings');
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      /* Don't restore rows/cols — they are auto-calculated per viewport */
+      delete parsed.rows;
+      delete parsed.cols;
+      Object.assign(settings, parsed);
+    }
+    const savedScenes = localStorage.getItem('splitFlap_scenes');
+    if (savedScenes) {
+      const parsed = JSON.parse(savedScenes);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        scenes = parsed;
+      }
+    }
+  } catch (e) { /* corrupt data */ }
+}
+
+/* ══════════════════════════════════════════
+   BOARD REBUILD
+   ══════════════════════════════════════════ */
+function rebuildBoard() {
+  /* Stop all active animations */
+  activeFlips.clear();
+  animLoopRunning = false;
+  targetGrid = null;
+  for (const tid of pendingFlipTimeouts) clearTimeout(tid);
+  pendingFlipTimeouts = [];
+
+  /* Recalculate dimensions to fill viewport */
+  autoSizeBoard();
+
+  createBoardDOM();
+  scaleBoard();
+
+  /* Sync config slider display values */
+  const rowsEl = document.getElementById('cfgRows');
+  const colsEl = document.getElementById('cfgCols');
+  if (rowsEl) { rowsEl.value = settings.rows; document.getElementById('cfgRowsVal').textContent = settings.rows; }
+  if (colsEl) { colsEl.value = settings.cols; document.getElementById('cfgColsVal').textContent = settings.cols; }
+
+  /* Reset current grid and apply active scene instantly */
+  currentGrid = Array.from({ length: settings.rows }, () =>
+    Array.from({ length: settings.cols }, () => blankToken())
+  );
+
+  const all = getAllScenes();
+  const idx = Math.min(settings.activeSceneIndex, all.length - 1);
+  if (all[idx]) {
+    const grid = sceneToTokens(all[idx], settings.rows, settings.cols);
+    for (let r = 0; r < settings.rows; r++) {
+      for (let c = 0; c < settings.cols; c++) {
+        const token = (grid[r] && grid[r][c]) || blankToken();
+        setStaticCell(r, c, token);
+        currentGrid[r][c] = token;
+      }
+    }
+  }
+}
+
+/* ══════════════════════════════════════════
+   INITIALIZATION
+   ══════════════════════════════════════════ */
+function init() {
+  loadSettings();
+
+  /* Apply theme */
+  if (settings.theme) {
+    document.body.className = `theme-${settings.theme}`;
+    document.querySelectorAll('.theme-swatch').forEach(s => {
+      s.classList.toggle('active', s.dataset.theme === settings.theme);
+    });
+  }
+
+  /* Auto-size board to fill viewport */
+  autoSizeBoard();
+
+  /* Build board */
+  createBoardDOM();
+  scaleBoard();
+
+  /* Initialize blank grid */
+  currentGrid = Array.from({ length: settings.rows }, () =>
+    Array.from({ length: settings.cols }, () => blankToken())
+  );
+
+  /* Set all cells to blank */
+  for (let r = 0; r < settings.rows; r++) {
+    for (let c = 0; c < settings.cols; c++) {
+      setStaticCell(r, c, blankToken());
+    }
+  }
+
+  /* Setup config UI */
+  setupConfigUI();
+  updateMuteIcon();
+  renderSceneList();
+
+  /* Clock */
+  updateClock();
+  setInterval(updateClock, 1000);
+
+  /* Responsive: re-calculate board size on resize */
+  let resizeTimer = null;
+  window.addEventListener('resize', () => {
+    /* Immediate scale to prevent jarring visual */
+    scaleBoard();
+    /* Debounced full rebuild with new row/col count */
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(() => {
+      const oldRows = settings.rows;
+      const oldCols = settings.cols;
+      autoSizeBoard();
+      if (settings.rows !== oldRows || settings.cols !== oldCols) {
+        rebuildBoard();
+        /* Update config sliders */
+        const rowsEl = document.getElementById('cfgRows');
+        const colsEl = document.getElementById('cfgCols');
+        if (rowsEl) { rowsEl.value = settings.rows; document.getElementById('cfgRowsVal').textContent = settings.rows; }
+        if (colsEl) { colsEl.value = settings.cols; document.getElementById('cfgColsVal').textContent = settings.cols; }
+      }
+    }, 300);
+  });
+
+  /* Audio unlock on first interaction */
+  const unlockAudio = () => {
+    initAudio();
+    if (audioCtx && audioCtx.state === 'suspended') {
+      audioCtx.resume();
+    }
+    document.removeEventListener('click', unlockAudio);
+    document.removeEventListener('touchstart', unlockAudio);
+    document.removeEventListener('keydown', unlockAudio);
+  };
+  document.addEventListener('click', unlockAudio);
+  document.addEventListener('touchstart', unlockAudio);
+  document.addEventListener('keydown', unlockAudio);
+
+  /* Keyboard shortcuts */
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      closeConfig();
+    }
+    /* Don't cycle scenes if user is typing in an input */
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+    const all = getAllScenes();
+    if (e.key === 'ArrowRight') {
+      applySceneByIndex((settings.activeSceneIndex + 1) % all.length);
+      pauseAutoRotateTemporarily();
+    } else if (e.key === 'ArrowLeft') {
+      applySceneByIndex((settings.activeSceneIndex - 1 + all.length) % all.length);
+      pauseAutoRotateTemporarily();
+    }
+  });
+
+  /* Clicking the board pauses auto-rotate */
+  document.getElementById('boardGrid').addEventListener('click', () => {
+    initAudio();
+    pauseAutoRotateTemporarily();
+  });
+
+  /* Apply first scene with animation after a short delay */
+  const all = getAllScenes();
+  const idx = Math.min(settings.activeSceneIndex, all.length - 1);
+  setTimeout(() => {
+    if (all[idx]) {
+      applyScene(all[idx]);
+      if (all[idx].live) startLiveUpdates();
+    }
+  }, 400);
+
+  /* Start auto-rotate if enabled */
+  if (settings.autoRotate) {
+    setTimeout(() => startAutoRotate(), 2000);
+  }
+}
+
+/* Kick it off */
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', init);
+} else {
+  init();
+}
+</script>
+
+<!--
+  ╔══════════════════════════════════════════════════════════════╗
+  ║                    TESTING CHECKLIST                         ║
+  ╠══════════════════════════════════════════════════════════════╣
+  ║                                                              ║
+  ║  [ ] Audio unlock works:                                     ║
+  ║      Click anywhere → subsequent flips produce sound.        ║
+  ║      Check mute toggle disables/enables.                     ║
+  ║      Volume slider changes loudness.                         ║
+  ║                                                              ║
+  ║  [ ] Reduced motion works:                                   ║
+  ║      Enable "prefers-reduced-motion: reduce" in OS/browser.  ║
+  ║      Verify: instant updates, no rapid flipping, no sound.   ║
+  ║                                                              ║
+  ║  [ ] Mobile layout OK:                                       ║
+  ║      Open on phone or use responsive mode in DevTools.       ║
+  ║      Board scales to fit viewport.                           ║
+  ║      Config drawer fills full width on small screens.        ║
+  ║      Touch interactions work (scene selection, sliders).     ║
+  ║                                                              ║
+  ║  [ ] localStorage persists:                                  ║
+  ║      Change settings → reload page → settings preserved.    ║
+  ║      Add custom scene → reload → scene still present.       ║
+  ║      Change theme → reload → theme persists.                ║
+  ║                                                              ║
+  ║  [ ] Performance acceptable at 20×6 grid:                    ║
+  ║      Open DevTools Performance tab → record a scene change. ║
+  ║      Verify: 60fps during animation (or close to it).       ║
+  ║      No main-thread blocking.                                ║
+  ║      GPU-accelerated transforms (check Layers panel).        ║
+  ║                                                              ║
+  ║  [ ] Scene management:                                       ║
+  ║      All 6 built-in scenes render correctly.                 ║
+  ║      Custom scenes can be added/edited/deleted.              ║
+  ║      Shape syntax {triangle}, {heart:outline}, etc. works.  ║
+  ║      Auto-rotate cycles through scenes smoothly.             ║
+  ║                                                              ║
+  ║  [ ] Visual polish:                                          ║
+  ║      Cells have physical depth (shadows, hinge, bevels).     ║
+  ║      Screws visible in board corners.                        ║
+  ║      Grain texture visible on board frame.                   ║
+  ║      Settle imperfection (slight rotation after flip).       ║
+  ║      All 4 themes render correctly.                          ║
+  ║                                                              ║
+  ╚══════════════════════════════════════════════════════════════╝
+-->
+</body>
+</html>
