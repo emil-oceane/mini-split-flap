@@ -1386,7 +1386,18 @@ const DEFAULT_SCENES = [
   {
     name: 'Waterfall',
     generator: 'waterfall',
-    flipDirection: 'down'
+    flipDirection: 'rows-down',
+    stagger: 450,
+    jitter: 0,
+    extraFlips: 2
+  },
+  {
+    name: 'Waterfall Extra',
+    generator: 'waterfall',
+    flipDirection: 'rows-down',
+    stagger: 700,
+    jitter: 0,
+    extraFlips: 6
   },
   {
     name: 'Celebration',
@@ -2201,11 +2212,15 @@ function applyGrid(newGrid, immediate, opts) {
       case 'diagonal-tl': t = (rows - 1 - ch.row) + (cols - 1 - ch.col); break;
       case 'center':      t = Math.sqrt((ch.row - midR) ** 2 + (ch.col - midC) ** 2); break;
       case 'random':      t = Math.random() * Math.max(rows, cols); break;
+      case 'rows-down':   t = ch.row; break;
       default:            t = ch.col + ch.row * 0.35; break; /* right */
     }
-    const delay = t * stagger + (Math.random() * jitter);
+    const useStagger = (opts && opts.stagger != null) ? opts.stagger : stagger;
+    const useJitter = (opts && opts.jitter != null) ? opts.jitter : jitter;
+    const useExtraFlips = (opts && opts.extraFlips != null) ? opts.extraFlips : extraFlips;
+    const delay = t * useStagger + (Math.random() * useJitter);
 
-    const queue = generateFlipQueue(ch.from, ch.to, extraFlips);
+    const queue = generateFlipQueue(ch.from, ch.to, useExtraFlips);
     const firstTarget = queue.shift();
     const ref = cellRefs[ch.row][ch.col];
     const dur = flipSpeed + (Math.random() - 0.5) * flipSpeed * 0.2; // slight variation
@@ -2229,7 +2244,12 @@ function getAllScenes() {
 
 function applyScene(scene, immediate) {
   const grid = sceneToTokens(scene, settings.rows, settings.cols);
-  applyGrid(grid, immediate, { flipDirection: scene.flipDirection });
+  applyGrid(grid, immediate, {
+    flipDirection: scene.flipDirection,
+    stagger: scene.stagger,
+    jitter: scene.jitter,
+    extraFlips: scene.extraFlips,
+  });
 }
 
 /* Board-level 3D flip transition */
