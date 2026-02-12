@@ -42,7 +42,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>Mini Split Flap — Interactive Retro Departure Board Simulator</title>
-<meta name="description" content="Mini Split Flap is a realistic split-flap display simulator with animated flipping letters, mechanical sounds, customizable scenes, live clock, weather, and market data. No install required — runs entirely in your browser.">
+<meta name="description" content="Mini Split Flap is a realistic split-flap display simulator with animated flipping letters, mechanical sounds, customizable scenes, live clock, and weather. No install required — runs entirely in your browser.">
 <meta name="keywords" content="mini split flap, split-flap display, departure board, flip board, solari board, retro display, flight board, train station display, mechanical display simulator">
 <meta name="author" content="Emil Tarazi">
 <meta name="robots" content="index, follow">
@@ -80,7 +80,7 @@
   "@type": "WebApplication",
   "name": "Mini Split Flap",
   "url": "https://minisplitflap.com/",
-  "description": "Mini Split Flap is a realistic interactive split-flap display simulator inspired by the mechanical departure boards found in train stations and airports. Features animated flipping letters with authentic mechanical sounds, customizable scenes, live clock, weather, and market data.",
+  "description": "Mini Split Flap is a realistic interactive split-flap display simulator inspired by the mechanical departure boards found in train stations and airports. Features animated flipping letters with authentic mechanical sounds, customizable scenes, live clock, and weather.",
   "applicationCategory": "Entertainment",
   "operatingSystem": "Any",
   "browserRequirements": "Requires a modern web browser",
@@ -306,6 +306,38 @@ body {
 .icon-btn svg { width: 16px; height: 16px; }
 .icon-btn.muted svg { color: var(--danger); opacity: 0.7; }
 
+/* Share tip popover */
+.share-tip-wrap { position: relative; }
+.share-tip-popover {
+  display: none;
+  position: absolute;
+  bottom: 36px;
+  right: 0;
+  background: var(--bg-cell, #1a1a2e);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 6px;
+  padding: 10px 14px;
+  width: 280px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-secondary);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+  z-index: 100;
+}
+.share-tip-popover.visible { display: block; }
+.share-tip-popover p { margin: 0 0 6px; }
+.share-tip-popover code {
+  background: rgba(255,255,255,0.08);
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-size: 11px;
+}
+.share-tip-popover a {
+  color: var(--accent, #e2b714);
+  text-decoration: none;
+}
+.share-tip-popover a:hover { text-decoration: underline; }
+
 /* ══════════════════════════════════════════
    BOARD GRID
    ══════════════════════════════════════════ */
@@ -313,6 +345,16 @@ body {
   display: grid;
   gap: var(--cell-gap);
   padding: 4px 0;
+}
+
+/* Board-level 3D flip transition */
+.board-grid-wrap {
+  perspective: 1200px;
+}
+.board-grid {
+  transform-style: preserve-3d;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
 }
 
 /* ══════════════════════════════════════════
@@ -743,6 +785,9 @@ input[type="checkbox"]:checked::after {
 }
 .scene-item-btn:hover { background: rgba(255,255,255,0.08); color: var(--text-primary); }
 .scene-item-btn.delete:hover { color: var(--danger); }
+.scene-item-btn.flip-toggle { opacity: 0.3; flex-shrink: 0; }
+.scene-item-btn.flip-toggle:hover { opacity: 0.7; }
+.scene-item-btn.flip-toggle.active { opacity: 1; color: var(--accent); }
 
 /* Add scene / action buttons */
 .config-btn {
@@ -769,11 +814,32 @@ input[type="checkbox"]:checked::after {
 .config-btn.primary:hover { background: var(--accent); }
 .config-btn.small { padding: 5px 10px; font-size: 11px; }
 
-/* Scene editor */
+/* Scene editor — inline, revealed below the Add Scene button */
 .scene-editor {
   display: none;
+  margin-top: 12px;
+  border-top: 1px solid rgba(255,255,255,0.06);
+  padding-top: 12px;
 }
-.scene-editor.active { display: block; }
+.scene-editor.active {
+  display: block;
+  animation: editorFadeIn 0.2s ease;
+}
+@keyframes editorFadeIn {
+  from { opacity: 0; transform: translateY(-6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.scene-editor-header {
+  margin-bottom: 10px;
+}
+.scene-editor-header h3 {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  margin: 0;
+}
 .scene-editor textarea {
   width: 100%;
   height: 140px;
@@ -948,7 +1014,7 @@ body.theme-green {
     <li>Realistic split-flap animation with 3D CSS transforms and staggered timing</li>
     <li>Authentic mechanical sound effects generated with the Web Audio API</li>
     <li>Customizable scenes — write your own messages with text and decorative shapes</li>
-    <li>Live data scenes: real-time clock, local weather, and stock market indices</li>
+    <li>Live data scenes: real-time clock and local weather</li>
     <li>Multiple animation directions: left-to-right, diagonal, center-out, and more</li>
     <li>Adjustable board size, flip speed, stagger delay, and jitter for fine-tuned aesthetics</li>
     <li>Four color themes: Charcoal, Midnight, Warm, and Terminal</li>
@@ -993,7 +1059,9 @@ body.theme-green {
         </div>
       </div>
 
-      <div class="board-grid" id="boardGrid"></div>
+      <div class="board-grid-wrap">
+        <div class="board-grid" id="boardGrid"></div>
+      </div>
 
       <div class="board-footer">
         <span class="board-footer-status"><span class="dot"></span>LOCAL MODE</span>
@@ -1010,6 +1078,23 @@ body.theme-green {
               <line x1="17" y1="9" x2="23" y2="15"/>
             </svg>
           </button>
+          <div class="share-tip-wrap">
+            <button class="icon-btn" id="btnShareTip" title="Share with a link" aria-label="Share tip">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
+                <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
+              </svg>
+            </button>
+            <div class="share-tip-popover" id="shareTipPopover">
+              <p>Share a custom message via URL:</p>
+              <p><code>?message=YOUR+TEXT</code></p>
+              <p>Multiple lines: <code>&amp;message=LINE+TWO</code></p>
+              <p id="shareTipExample"></p>
+            </div>
+          </div>
+          <a class="icon-btn" href="https://github.com/emil-oceane/mini-split-flap" target="_blank" rel="noopener noreferrer" title="View on GitHub" aria-label="View on GitHub">
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/></svg>
+          </a>
         </div>
       </div>
     </div>
@@ -1166,6 +1251,20 @@ body.theme-green {
       <button class="config-btn small" id="btnAddScene">+ Add Scene</button>
       <button class="config-btn small" id="btnResetScenes">Reset to Defaults</button>
     </div>
+    <!-- Scene editor (inline, hidden by default) -->
+    <div class="scene-editor" id="sceneEditor">
+      <div class="scene-editor-header">
+        <h3 id="editorTitle">Edit Scene</h3>
+      </div>
+      <input class="scene-editor-name" id="editorName" type="text" placeholder="Scene name" maxlength="40">
+      <textarea id="editorText" placeholder="Type message here...&#10;Use {triangle} {heart} {star} etc. for shapes&#10;One line per row"></textarea>
+      <div class="shape-palette" id="shapePalette"></div>
+      <div class="editor-actions">
+        <button class="config-btn small" id="btnEditorCancel">Cancel</button>
+        <button class="config-btn small" id="btnEditorPreview">Preview</button>
+        <button class="config-btn small primary" id="btnEditorSave">Save</button>
+      </div>
+    </div>
   </div>
 
   <!-- Live scenes -->
@@ -1190,19 +1289,6 @@ body.theme-green {
         <input type="range" id="cfgAutoInterval" min="3" max="30" value="8" step="1">
       </div>
       <span class="config-value" id="cfgAutoIntervalVal">8s</span>
-    </div>
-  </div>
-
-  <!-- Scene editor -->
-  <div class="config-section scene-editor" id="sceneEditor">
-    <h3 id="editorTitle">Edit Scene</h3>
-    <input class="scene-editor-name" id="editorName" type="text" placeholder="Scene name" maxlength="40">
-    <textarea id="editorText" placeholder="Type message here...&#10;Use {triangle} {heart} {star} etc. for shapes&#10;One line per row"></textarea>
-    <div class="shape-palette" id="shapePalette"></div>
-    <div class="editor-actions">
-      <button class="config-btn small" id="btnEditorCancel">Cancel</button>
-      <button class="config-btn small" id="btnEditorPreview">Preview</button>
-      <button class="config-btn small primary" id="btnEditorSave">Save</button>
     </div>
   </div>
 </div>
@@ -1240,16 +1326,16 @@ function getShapeSVG(name, style, accent) {
 let settings = {
   rows: 6,
   cols: 20,
-  cellSize: 56,
-  flipSpeed: 160,
-  stagger: 30,
-  flipDirection: 'right',
-  jitter: 20,
+  cellSize: 85,
+  flipSpeed: 120,
+  stagger: 22,
+  flipDirection: 'down',
+  jitter: 15,
   extraFlips: 2,
   volume: 35,
-  soundTone: 30,
-  soundSnap: 25,
-  soundBody: 35,
+  soundTone: 25,
+  soundSnap: 15,
+  soundBody: 45,
   soundPreset: 'waterfall',
   muted: false,
   theme: '',
@@ -1294,23 +1380,8 @@ const DEFAULT_SCENES = [
     align: 'center'
   },
   {
-    name: 'Departure',
-    lines: ['', 'PLATFORM 5', 'NEXT:  08:45', 'DESTINATION: CENTRAL', '', '{check} ON TIME'],
-    align: 'center'
-  },
-  {
-    name: 'Delayed',
-    lines: ['', '', '{triangle} DELAYED {triangle}', 'PLEASE STAND BY', '', ''],
-    align: 'center'
-  },
-  {
     name: 'Pattern',
     generator: true
-  },
-  {
-    name: 'Route Map',
-    lines: ['', '  A {arrow} B {arrow} C {arrow} D', '  12   15   18   21', '', '{diamond} EXPRESS SERVICE {diamond}', ''],
-    align: 'center'
   },
   {
     name: 'Celebration',
@@ -1327,11 +1398,6 @@ const DEFAULT_SCENES = [
     generator: 'weather',
     live: true
   },
-  {
-    name: 'Market',
-    generator: 'market',
-    live: true
-  }
 ];
 
 let scenes = DEFAULT_SCENES.map(s => ({ ...s }));
@@ -1394,7 +1460,6 @@ function sceneToTokens(scene, rows, cols) {
     switch (scene.generator) {
       case 'datetime': return generateDateTimeScene(rows, cols);
       case 'weather':  return generateWeatherScene(rows, cols);
-      case 'market':   return generateMarketScene(rows, cols);
       default:         return generatePatternGrid(rows, cols);
     }
   }
@@ -1468,9 +1533,63 @@ let weatherCity = '';
 let weatherFetchedAt = 0;
 let weatherFetching = false;
 
+function getCachedLocation() {
+  try {
+    const cached = localStorage.getItem('splitFlap_location');
+    if (cached) {
+      const { latitude, longitude, city, ts } = JSON.parse(cached);
+      /* Cache valid for 1 hour */
+      if (Date.now() - ts < 3600000 && latitude && longitude) {
+        return { latitude, longitude, city };
+      }
+    }
+  } catch (e) { /* ignore */ }
+  return null;
+}
+
+function cacheLocation(latitude, longitude, city) {
+  try {
+    localStorage.setItem('splitFlap_location', JSON.stringify({ latitude, longitude, city, ts: Date.now() }));
+  } catch (e) { /* ignore */ }
+}
+
+function fetchWeatherWithCoords(latitude, longitude) {
+  /* Reverse geocode for city name (only if not cached) */
+  if (!weatherCity) {
+    fetch(`https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json`)
+      .then(r => r.json())
+      .then(geo => {
+        weatherCity = (geo.address.city || geo.address.town || geo.address.village || '').toUpperCase();
+        cacheLocation(latitude, longitude, weatherCity);
+        console.log(`[weather] city: ${weatherCity}`);
+      })
+      .catch((e) => { console.log('[weather] geocode failed:', e); });
+  }
+  /* Fetch weather from Open-Meteo */
+  fetch(`https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m&temperature_unit=fahrenheit&wind_speed_unit=mph`)
+    .then(r => r.json())
+    .then(data => {
+      weatherData = data.current;
+      weatherFetchedAt = Date.now();
+      weatherFetching = false;
+      console.log('[weather] data received:', weatherData);
+    })
+    .catch((e) => { weatherData = { error: 'FETCH FAILED' }; weatherFetching = false; console.log('[weather] fetch failed:', e); });
+}
+
 function fetchWeather() {
   if (weatherFetching) return;
   weatherFetching = true;
+
+  /* Try cached location first to avoid permission prompt */
+  const cached = getCachedLocation();
+  if (cached) {
+    console.log(`[weather] using cached location: ${cached.latitude.toFixed(2)}, ${cached.longitude.toFixed(2)}`);
+    if (cached.city) weatherCity = cached.city;
+    fetchWeatherWithCoords(cached.latitude, cached.longitude);
+    return;
+  }
+
   if (!navigator.geolocation) {
     weatherData = { error: 'NO GEOLOCATION' };
     weatherFetching = false;
@@ -1482,24 +1601,8 @@ function fetchWeather() {
     (pos) => {
       const { latitude, longitude } = pos.coords;
       console.log(`[weather] got location: ${latitude.toFixed(2)}, ${longitude.toFixed(2)}`);
-      /* Reverse geocode for city name */
-      fetch(`https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json`)
-        .then(r => r.json())
-        .then(geo => {
-          weatherCity = (geo.address.city || geo.address.town || geo.address.village || '').toUpperCase();
-          console.log(`[weather] city: ${weatherCity}`);
-        })
-        .catch((e) => { console.log('[weather] geocode failed:', e); });
-      /* Fetch weather from Open-Meteo */
-      fetch(`https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m&temperature_unit=fahrenheit&wind_speed_unit=mph`)
-        .then(r => r.json())
-        .then(data => {
-          weatherData = data.current;
-          weatherFetchedAt = Date.now();
-          weatherFetching = false;
-          console.log('[weather] data received:', weatherData);
-        })
-        .catch((e) => { weatherData = { error: 'FETCH FAILED' }; weatherFetching = false; console.log('[weather] fetch failed:', e); });
+      cacheLocation(latitude, longitude, '');
+      fetchWeatherWithCoords(latitude, longitude);
     },
     (err) => { weatherData = { error: 'LOCATION DENIED' }; weatherFetching = false; console.log('[weather] location denied:', err); }
   );
@@ -1542,87 +1645,6 @@ function generateWeatherScene(rows, cols) {
     `WIND: ${wind} MPH`,
     ''
   ];
-  return linesToGrid(lines, rows, cols, 'center');
-}
-
-/* ══════════════════════════════════════════
-   LIVE SCENE: MARKET
-   ══════════════════════════════════════════ */
-let marketData = null;
-let marketFetchedAt = 0;
-let marketFetching = false;
-
-function fetchMarket() {
-  if (marketFetching) return;
-  marketFetching = true;
-  const symbols = ['^GSPC', '^DJI', '^IXIC'];
-  const url = `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${symbols.join(',')}`;
-  console.log('[market] fetching from Yahoo Finance...');
-
-  fetch(url)
-    .then(r => r.json())
-    .then(data => {
-      const quotes = data.quoteResponse.result;
-      marketData = quotes.map(q => ({
-        symbol: q.symbol.replace('^', ''),
-        name: q.shortName || q.symbol,
-        price: q.regularMarketPrice,
-        change: q.regularMarketChangePercent
-      }));
-      marketFetchedAt = Date.now();
-      marketFetching = false;
-      console.log('[market] Yahoo data received:', marketData);
-    })
-    .catch((e) => {
-      console.log('[market] Yahoo failed, trying fallback:', e);
-      fetchMarketFallback();
-    });
-}
-
-function fetchMarketFallback() {
-  /* Fallback: use Alpha Vantage demo endpoint for a single quote */
-  console.log('[market] trying Alpha Vantage fallback...');
-  fetch('https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=SPY&apikey=demo')
-    .then(r => r.json())
-    .then(data => {
-      const q = data['Global Quote'];
-      if (q && q['05. price']) {
-        marketData = [{
-          symbol: 'SPY',
-          name: 'S/P 500 ETF',
-          price: parseFloat(q['05. price']),
-          change: parseFloat(q['10. change percent'])
-        }];
-        marketFetchedAt = Date.now();
-        console.log('[market] Alpha Vantage data received:', marketData);
-      } else {
-        marketData = { error: true };
-        console.log('[market] Alpha Vantage returned no data:', data);
-      }
-      marketFetching = false;
-    })
-    .catch((e) => { marketData = { error: true }; marketFetching = false; console.log('[market] Alpha Vantage failed:', e); });
-}
-
-function generateMarketScene(rows, cols) {
-  if (!marketData) {
-    fetchMarket();
-    return linesToGrid(['', '', 'LOADING MARKET...', '', '', ''], rows, cols, 'center');
-  }
-  if (marketData.error) {
-    return linesToGrid(['', '', 'MARKET DATA UNAVAILABLE', 'CORS RESTRICTION', '', ''], rows, cols, 'center');
-  }
-  /* Refresh every 2 minutes */
-  if (Date.now() - marketFetchedAt > 120000) fetchMarket();
-
-  const lines = ['MARKET'];
-  for (const q of marketData) {
-    const dir = q.change >= 0 ? '+' : '';
-    const price = q.price.toFixed(2);
-    const pct = `${dir}${q.change.toFixed(2)}`;
-    lines.push(`${q.symbol}  ${price}  ${pct}`);
-  }
-  while (lines.length < 6) lines.push('');
   return linesToGrid(lines, rows, cols, 'center');
 }
 
@@ -1733,89 +1755,91 @@ function playClack(volume) {
    */
 
   /* Layer 1: Flutter — longer, softer noise shaped by tone */
-  const flutterDur = 0.025 + (1 - tone) * 0.015; /* darker = longer, breathier */
+  const flutterDur = 0.04 + (1 - tone) * 0.03; /* longer overall — darker = breathier */
   const flutterLen = Math.floor(rate * flutterDur);
   const flutterBuf = audioCtx.createBuffer(1, flutterLen, rate);
   const flutterData = flutterBuf.getChannelData(0);
   for (let i = 0; i < flutterLen; i++) {
-    /* Soft attack, gentle decay */
+    /* Soft attack, very gentle decay — longer tail */
     const t = i / flutterLen;
-    const env = Math.sin(t * Math.PI) * Math.pow(1 - t, 1.5);
+    const env = Math.sin(t * Math.PI * 0.8) * Math.pow(1 - t, 1.0);
     flutterData[i] = (Math.random() * 2 - 1) * env;
   }
   const flutterSrc = audioCtx.createBufferSource();
   flutterSrc.buffer = flutterBuf;
 
   /* Tone controls the filter center — low tone = warm rumble, high = airy hiss */
-  const hpFreq = 400 + tone * 1400;
-  const bpFreq = 1200 + tone * 3000 + Math.random() * 800;
+  const hpFreq = 200 + tone * 1800;
+  const bpFreq = 600 + tone * 3600 + Math.random() * 600;
 
   const hp = audioCtx.createBiquadFilter();
   hp.type = 'highpass';
   hp.frequency.value = hpFreq;
-  hp.Q.value = 0.3;
+  hp.Q.value = 0.25;
 
   const bp = audioCtx.createBiquadFilter();
   bp.type = 'bandpass';
   bp.frequency.value = bpFreq;
-  bp.Q.value = 0.3 + tone * 0.4;
+  bp.Q.value = 0.25 + tone * 0.3;
 
   const flutterGain = audioCtx.createGain();
-  flutterGain.gain.setValueAtTime(vol * 0.18, now);
-  flutterGain.gain.exponentialRampToValueAtTime(0.001, now + flutterDur + 0.005);
+  flutterGain.gain.setValueAtTime(vol * 0.16, now);
+  flutterGain.gain.exponentialRampToValueAtTime(0.001, now + flutterDur + 0.015);
 
   flutterSrc.connect(hp);
   hp.connect(bp);
   bp.connect(flutterGain);
   flutterGain.connect(audioCtx.destination);
   flutterSrc.start(now);
-  flutterSrc.stop(now + flutterDur + 0.01);
+  flutterSrc.stop(now + flutterDur + 0.02);
 
-  /* Layer 2: Snap — the flap hitting the stop. Controlled by snap parameter. */
+  /* Layer 2: Snap — the flap hitting the stop. Controlled by snap parameter.
+     Softer overall — less sharp transient, longer decay. */
   if (snap > 0.05) {
-    const snapDur = 0.004 + snap * 0.008;
+    const snapDur = 0.008 + snap * 0.014;
     const snapLen = Math.floor(rate * snapDur);
     const snapBuf = audioCtx.createBuffer(1, snapLen, rate);
     const snapData = snapBuf.getChannelData(0);
     for (let i = 0; i < snapLen; i++) {
-      snapData[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / snapLen, 3 + snap * 5);
+      snapData[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / snapLen, 2 + snap * 3);
     }
     const snapSrc = audioCtx.createBufferSource();
     snapSrc.buffer = snapBuf;
 
     const snapBp = audioCtx.createBiquadFilter();
     snapBp.type = 'bandpass';
-    snapBp.frequency.value = 800 + tone * 2000 + Math.random() * 600;
-    snapBp.Q.value = 0.6 + snap * 1.5;
+    snapBp.frequency.value = 400 + tone * 2400 + Math.random() * 500;
+    snapBp.Q.value = 0.4 + snap * 1.0;
 
     const snapGainNode = audioCtx.createGain();
-    const snapVol = vol * snap * 0.15;
+    const snapVol = vol * snap * 0.10;
     snapGainNode.gain.setValueAtTime(snapVol, now);
-    snapGainNode.gain.exponentialRampToValueAtTime(0.001, now + snapDur + 0.003);
+    snapGainNode.gain.exponentialRampToValueAtTime(0.001, now + snapDur + 0.008);
 
     snapSrc.connect(snapBp);
     snapBp.connect(snapGainNode);
     snapGainNode.connect(audioCtx.destination);
     snapSrc.start(now);
-    snapSrc.stop(now + snapDur + 0.005);
+    snapSrc.stop(now + snapDur + 0.012);
   }
 
-  /* Layer 3: Body resonance — the housing vibrating. Controlled by body parameter. */
+  /* Layer 3: Body resonance — the housing vibrating. Controlled by body parameter.
+     Longer sustain for a warmer, more rounded sound. */
   if (body > 0.05) {
     const bodyOsc = audioCtx.createOscillator();
     bodyOsc.type = 'sine';
-    bodyOsc.frequency.value = 60 + body * 80 + Math.random() * 30;
-    const bodyDur = 0.02 + body * 0.04;
+    bodyOsc.frequency.value = 55 + body * 70 + Math.random() * 25;
+    const bodyDur = 0.04 + body * 0.07;
 
     const bodyGainNode = audioCtx.createGain();
-    const bodyVol = vol * body * 0.06;
+    const bodyVol = vol * body * 0.07;
     bodyGainNode.gain.setValueAtTime(bodyVol, now);
     bodyGainNode.gain.exponentialRampToValueAtTime(0.001, now + bodyDur);
 
     bodyOsc.connect(bodyGainNode);
     bodyGainNode.connect(audioCtx.destination);
     bodyOsc.start(now);
-    bodyOsc.stop(now + bodyDur + 0.005);
+    bodyOsc.stop(now + bodyDur + 0.01);
   }
 }
 
@@ -2010,7 +2034,7 @@ function updateFlip(key, state, timestamp) {
     if (state.queue.length > 0) {
       const next = state.queue.shift();
       const isLast = state.queue.length === 0;
-      const nextDur = isLast ? state.duration : state.duration * 0.45;
+      const nextDur = isLast ? state.duration : state.duration * 0.35;
       beginSingleFlip(key, state.ref, state.row, state.col, state.nextToken, next, state.queue, nextDur);
     } else {
       /* Final — update currentGrid */
@@ -2185,18 +2209,63 @@ function applyScene(scene, immediate) {
   applyGrid(grid, immediate);
 }
 
+/* Board-level 3D flip transition */
+let boardFlipping = false;
+
+function performBoardFlip(callback) {
+  if (boardFlipping) { callback(); return; }
+  boardFlipping = true;
+
+  const grid = document.getElementById('boardGrid');
+  grid.style.transition = 'transform 0.5s cubic-bezier(0.4, 0, 0.2, 1)';
+  grid.style.transform = 'rotateX(-90deg)';
+
+  const onEnd = () => {
+    grid.removeEventListener('transitionend', onEnd);
+    /* Instantly set content while board is hidden */
+    callback();
+    /* Flip in from the other side */
+    grid.style.transition = 'none';
+    grid.style.transform = 'rotateX(90deg)';
+    /* Force reflow */
+    void grid.offsetHeight;
+    grid.style.transition = 'transform 0.5s cubic-bezier(0.4, 0, 0.2, 1)';
+    grid.style.transform = 'rotateX(0deg)';
+
+    const onDone = () => {
+      grid.removeEventListener('transitionend', onDone);
+      grid.style.transition = '';
+      grid.style.transform = '';
+      boardFlipping = false;
+    };
+    grid.addEventListener('transitionend', onDone);
+  };
+  grid.addEventListener('transitionend', onEnd);
+}
+
 function applySceneByIndex(index, immediate) {
   const all = getAllScenes();
   if (index >= 0 && index < all.length) {
+    const prevScene = all[settings.activeSceneIndex];
+    const doFlip = prevScene && prevScene.boardFlip && index !== settings.activeSceneIndex && !immediate;
+
     settings.activeSceneIndex = index;
-    applyScene(all[index], immediate);
     saveSettings();
     renderSceneList();
-    /* Start or stop live updates based on scene type */
-    if (all[index].live) {
-      startLiveUpdates();
+
+    const applyAndStartLive = () => {
+      applyScene(all[index], immediate);
+      if (all[index].live) {
+        startLiveUpdates();
+      } else {
+        stopLiveUpdates();
+      }
+    };
+
+    if (doFlip) {
+      performBoardFlip(applyAndStartLive);
     } else {
-      stopLiveUpdates();
+      applyAndStartLive();
     }
   }
 }
@@ -2345,9 +2414,9 @@ function setupConfigUI() {
 
   /* Sound presets */
   const SOUND_PRESETS = {
-    waterfall:  { soundTone: 30, soundSnap: 25, soundBody: 35 },
+    waterfall:  { soundTone: 25, soundSnap: 15, soundBody: 45 },
     mechanical: { soundTone: 45, soundSnap: 75, soundBody: 60 },
-    soft:       { soundTone: 20, soundSnap: 10, soundBody: 15 },
+    soft:       { soundTone: 15, soundSnap: 5,  soundBody: 20 },
     crisp:      { soundTone: 75, soundSnap: 65, soundBody: 10 },
     heavy:      { soundTone: 25, soundSnap: 90, soundBody: 85 },
   };
@@ -2426,6 +2495,25 @@ function setupConfigUI() {
     saveSettings();
   });
 
+  /* Share tip popover */
+  const shareTipBtn = document.getElementById('btnShareTip');
+  const shareTipPop = document.getElementById('shareTipPopover');
+  shareTipBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const isVisible = shareTipPop.classList.toggle('visible');
+    if (isVisible) {
+      const base = window.location.origin + window.location.pathname;
+      const exLink = document.getElementById('shareTipExample');
+      const exUrl = base + '?message=HELLO+WORLD';
+      exLink.innerHTML = 'Try it: <a href="' + exUrl + '">?message=HELLO+WORLD</a>';
+    }
+  });
+  document.addEventListener('click', (e) => {
+    if (!shareTipPop.contains(e.target) && e.target !== shareTipBtn) {
+      shareTipPop.classList.remove('visible');
+    }
+  });
+
   /* Theme swatches */
   document.querySelectorAll('.theme-swatch').forEach(swatch => {
     swatch.addEventListener('click', () => {
@@ -2463,7 +2551,9 @@ function setupConfigUI() {
     document.getElementById('editorTitle').textContent = 'New Scene';
     document.getElementById('editorName').value = '';
     document.getElementById('editorText').value = '';
-    document.getElementById('sceneEditor').classList.add('active');
+    const editor = document.getElementById('sceneEditor');
+    editor.classList.add('active');
+    editor.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   });
 
   /* Reset scenes to defaults */
@@ -2525,6 +2615,19 @@ function renderSceneList() {
     nameEl.textContent = scene.name;
     item.appendChild(nameEl);
 
+    /* Board flip toggle */
+    const flipBtn = document.createElement('button');
+    flipBtn.className = 'scene-item-btn flip-toggle' + (scene.boardFlip ? ' active' : '');
+    flipBtn.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 1l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="M7 23l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>';
+    flipBtn.title = scene.boardFlip ? 'Board flip ON (click to disable)' : 'Board flip OFF (click to enable)';
+    flipBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      scene.boardFlip = !scene.boardFlip;
+      saveSettings();
+      renderSceneList();
+    });
+    item.appendChild(flipBtn);
+
     const actions = document.createElement('div');
     actions.className = 'scene-item-actions';
 
@@ -2539,7 +2642,9 @@ function renderSceneList() {
         document.getElementById('editorTitle').textContent = 'Edit Scene';
         document.getElementById('editorName').value = scene.name;
         document.getElementById('editorText').value = (scene.lines || []).join('\n');
-        document.getElementById('sceneEditor').classList.add('active');
+        const editor = document.getElementById('sceneEditor');
+        editor.classList.add('active');
+        editor.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
       });
       actions.appendChild(editBtn);
     }
@@ -2663,8 +2768,47 @@ function rebuildBoard() {
 /* ══════════════════════════════════════════
    INITIALIZATION
    ══════════════════════════════════════════ */
+function parseUrlMessages() {
+  const params = new URLSearchParams(window.location.search);
+  const urlScenes = [];
+
+  /* Collect "message" params — multiple values become lines of one scene */
+  const messageVals = params.getAll('message');
+  if (messageVals.length > 0) {
+    urlScenes.push({
+      name: 'Message',
+      lines: messageVals.map(v => v.toUpperCase()),
+      align: 'center'
+    });
+  }
+
+  /* Collect numbered params: message1, message2, ... (each is a separate scene) */
+  for (let i = 1; i <= 20; i++) {
+    const val = params.get('message' + i);
+    if (val !== null) {
+      urlScenes.push({
+        name: urlScenes.length === 0 && messageVals.length === 0 ? 'Message' : 'Message ' + (urlScenes.length + 1),
+        lines: [val.toUpperCase()],
+        align: 'center'
+      });
+    }
+  }
+
+  return urlScenes;
+}
+
 function init() {
   loadSettings();
+
+  /* Parse URL query params for message scenes */
+  const urlScenes = parseUrlMessages();
+  if (urlScenes.length > 0) {
+    scenes = [...urlScenes, ...scenes];
+    settings.activeSceneIndex = 0;
+    if (urlScenes.length > 1 && !settings.autoRotate) {
+      settings.autoRotate = true;
+    }
+  }
 
   /* Apply theme */
   if (settings.theme) {
@@ -2724,9 +2868,11 @@ function init() {
     }, 300);
   });
 
-  /* Audio unlock on first interaction */
+  /* Initialize audio early so first scene flips produce sound */
+  initAudio();
+
+  /* Resume AudioContext on first user interaction (browser autoplay policy) */
   const unlockAudio = () => {
-    initAudio();
     if (audioCtx && audioCtx.state === 'suspended') {
       audioCtx.resume();
     }
