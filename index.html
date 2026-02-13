@@ -1179,7 +1179,18 @@ body.theme-green {
       <span class="config-value" id="cfgJitterVal">20ms</span>
     </div>
     <div class="config-row">
-      <span class="config-label">Extra Flips</span>
+      <span class="config-label">Realistic Flips</span>
+      <input type="checkbox" id="cfgRealisticFlips" checked>
+    </div>
+    <div class="config-row" id="drumSpeedRow">
+      <span class="config-label">Drum Speed</span>
+      <div class="config-slider-wrap">
+        <input type="range" id="cfgDrumSpeed" min="1" max="8" value="3" step="0.5">
+      </div>
+      <span class="config-value" id="cfgDrumSpeedVal">3s</span>
+    </div>
+    <div class="config-row" id="skipFlipsRow" style="display:none">
+      <span class="config-label">Skip Flips</span>
       <div class="config-slider-wrap">
         <input type="range" id="cfgExtraFlips" min="0" max="8" value="2" step="1">
       </div>
@@ -1334,6 +1345,8 @@ let settings = {
   flipDirection: 'down',
   jitter: 15,
   extraFlips: 2,
+  realisticFlips: true,
+  drumSpeed: 3,
   volume: 35,
   soundTone: 25,
   soundSnap: 15,
@@ -2020,7 +2033,7 @@ function updateFlip(key, state, timestamp) {
     if (state.queue.length > 0) {
       const next = state.queue.shift();
       const isLast = state.queue.length === 0;
-      const nextDur = isLast ? state.duration : state.duration * 0.35;
+      const nextDur = isLast ? state.duration : (settings.realisticFlips ? state.duration : state.duration * 0.35);
       beginSingleFlip(key, state.ref, state.row, state.col, state.nextToken, next, state.queue, nextDur);
     } else {
       /* Final — update currentGrid */
@@ -2057,6 +2070,7 @@ function beginSingleFlip(key, ref, row, col, fromToken, toToken, queue, duration
    We simulate this by stepping through the charset in order. */
 function generateFlipQueue(from, to, extraFlips) {
   const queue = [];
+  const realistic = settings.realisticFlips;
 
   if (from.type === 'char' && to.type === 'char') {
     const fromIdx = CHAR_SET.indexOf(from.value);
@@ -2068,26 +2082,31 @@ function generateFlipQueue(from, to, extraFlips) {
         ? toIdx - fromIdx
         : CHAR_SET.length - fromIdx + toIdx;
 
-      /* Determine how many intermediate flaps to show.
-         Real drums show every character; we show a subset for speed. */
-      const maxIntermediates = Math.min(forwardDist - 1, extraFlips + 2 + Math.floor(Math.random() * 2));
+      if (realistic) {
+        /* Realistic mode: show every intermediate character */
+        for (let i = 1; i < forwardDist; i++) {
+          const idx = (fromIdx + i) % CHAR_SET.length;
+          queue.push(charToken(CHAR_SET[idx]));
+        }
+      } else {
+        /* Skip mode: show a subset of intermediates for speed */
+        const maxIntermediates = Math.min(forwardDist - 1, extraFlips + 2 + Math.floor(Math.random() * 2));
 
-      if (maxIntermediates > 0 && forwardDist > 1) {
-        /* Step through the character set evenly */
-        const stepSize = Math.max(1, Math.floor(forwardDist / (maxIntermediates + 1)));
-        let idx = fromIdx;
-        for (let i = 0; i < maxIntermediates; i++) {
-          idx = (idx + stepSize) % CHAR_SET.length;
-          /* Don't include the target in intermediates */
-          if (idx !== toIdx) {
-            queue.push(charToken(CHAR_SET[idx]));
+        if (maxIntermediates > 0 && forwardDist > 1) {
+          const stepSize = Math.max(1, Math.floor(forwardDist / (maxIntermediates + 1)));
+          let idx = fromIdx;
+          for (let i = 0; i < maxIntermediates; i++) {
+            idx = (idx + stepSize) % CHAR_SET.length;
+            if (idx !== toIdx) {
+              queue.push(charToken(CHAR_SET[idx]));
+            }
           }
         }
       }
     }
   } else {
     /* For shapes or mixed types, cycle through random shapes/chars */
-    const count = extraFlips + Math.floor(Math.random() * 2);
+    const count = realistic ? 6 + Math.floor(Math.random() * 3) : extraFlips + Math.floor(Math.random() * 2);
     for (let i = 0; i < count; i++) {
       if (to.type === 'shape') {
         const rndShape = SHAPE_NAMES[Math.floor(Math.random() * SHAPE_NAMES.length)];
@@ -2173,7 +2192,11 @@ function applyGrid(newGrid, immediate, opts) {
     let useJitter = (opts && opts.jitter != null) ? opts.jitter : jitter;
     let useExtraFlips = (opts && opts.extraFlips != null) ? opts.extraFlips : extraFlips;
     if (dir === 'waterfall') {
-      useStagger = flipSpeed + extraFlips * flipSpeed * 0.35 + 50;
+      if (settings.realisticFlips) {
+        useStagger = settings.drumSpeed * 1000 * 0.5 + 50; /* half a drum rotation per row */
+      } else {
+        useStagger = flipSpeed + extraFlips * flipSpeed * 0.35 + 50;
+      }
       useJitter = 0;
     } else if (dir === 'waterfall-extra') {
       useExtraFlips = 40;
@@ -2185,7 +2208,11 @@ function applyGrid(newGrid, immediate, opts) {
     const queue = generateFlipQueue(ch.from, ch.to, useExtraFlips);
     const firstTarget = queue.shift();
     const ref = cellRefs[ch.row][ch.col];
-    const dur = flipSpeed + (Math.random() - 0.5) * flipSpeed * 0.2; // slight variation
+    /* In realistic mode, each flip = drumSpeed / charset length.
+       In skip mode, use flipSpeed with slight random variation. */
+    const dur = settings.realisticFlips
+      ? (settings.drumSpeed * 1000) / CHAR_SET.length
+      : flipSpeed + (Math.random() - 0.5) * flipSpeed * 0.2;
 
     const tid = setTimeout(() => {
       /* Reset settle transform */
@@ -2483,6 +2510,32 @@ function setupConfigUI() {
       startLiveUpdates();
       applyScene(active);
     }
+  });
+
+  /* Realistic flips checkbox */
+  const rfCheck = document.getElementById('cfgRealisticFlips');
+  const skipFlipsRow = document.getElementById('skipFlipsRow');
+  const drumSpeedRow = document.getElementById('drumSpeedRow');
+  rfCheck.checked = settings.realisticFlips;
+  skipFlipsRow.style.display = settings.realisticFlips ? 'none' : '';
+  drumSpeedRow.style.display = settings.realisticFlips ? '' : 'none';
+  rfCheck.addEventListener('change', () => {
+    settings.realisticFlips = rfCheck.checked;
+    skipFlipsRow.style.display = rfCheck.checked ? 'none' : '';
+    drumSpeedRow.style.display = rfCheck.checked ? '' : 'none';
+    saveSettings();
+  });
+
+  /* Drum speed slider */
+  const drumSpeedInput = document.getElementById('cfgDrumSpeed');
+  const drumSpeedVal = document.getElementById('cfgDrumSpeedVal');
+  drumSpeedInput.value = settings.drumSpeed;
+  drumSpeedVal.textContent = settings.drumSpeed + 's';
+  drumSpeedInput.addEventListener('input', () => {
+    const v = parseFloat(drumSpeedInput.value);
+    settings.drumSpeed = v;
+    drumSpeedVal.textContent = v + 's';
+    saveSettings();
   });
 
   /* Auto-rotate checkbox */
