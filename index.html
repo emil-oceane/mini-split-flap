@@ -1727,14 +1727,57 @@ function diffTokens(oldGrid, newGrid, rows, cols) {
 /* ══════════════════════════════════════════
    SOUND ENGINE
    ══════════════════════════════════════════ */
+let flapBuffer = null;
+let flapSlices = [];
+
 function initAudio() {
   if (audioCtx) return;
   try {
     audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     audioUnlocked = true;
+    loadFlapSample();
   } catch (e) {
     console.warn('WebAudio not available');
   }
+}
+
+function loadFlapSample() {
+  fetch('multip_flap.wav')
+    .then(r => r.arrayBuffer())
+    .then(buf => audioCtx.decodeAudioData(buf))
+    .then(decoded => {
+      flapBuffer = decoded;
+      flapSlices = detectFlaps(decoded);
+      console.log(`[audio] loaded ${flapSlices.length} flap slices`);
+    })
+    .catch(e => console.warn('[audio] failed to load flap sample:', e));
+}
+
+/* Detect individual flap sounds by finding amplitude peaks */
+function detectFlaps(buffer) {
+  const data = buffer.getChannelData(0);
+  const rate = buffer.sampleRate;
+  const windowSize = Math.floor(rate * 0.01); /* 10ms windows */
+  const threshold = 0.05;
+  const minGap = Math.floor(rate * 0.08); /* min 80ms between flaps */
+  const slicePad = Math.floor(rate * 0.02); /* 20ms padding before peak */
+  const sliceDur = Math.floor(rate * 0.15); /* 150ms per slice */
+  const slices = [];
+  let lastPeak = -minGap;
+
+  for (let i = 0; i < data.length - windowSize; i += windowSize) {
+    let rms = 0;
+    for (let j = i; j < i + windowSize; j++) rms += data[j] * data[j];
+    rms = Math.sqrt(rms / windowSize);
+
+    if (rms > threshold && i - lastPeak > minGap) {
+      const start = Math.max(0, i - slicePad);
+      const end = Math.min(data.length, start + sliceDur);
+      slices.push({ start: start / rate, duration: (end - start) / rate });
+      lastPeak = i;
+    }
+  }
+  return slices;
 }
 
 function playClack(volume) {
@@ -1742,107 +1785,44 @@ function playClack(volume) {
   const vol = (volume != null ? volume : settings.volume) / 100;
   if (vol <= 0) return;
 
+  if (flapBuffer && flapSlices.length > 0) {
+    /* Play a random real flap slice */
+    const slice = flapSlices[Math.floor(Math.random() * flapSlices.length)];
+    const src = audioCtx.createBufferSource();
+    src.buffer = flapBuffer;
+    /* Slight pitch variation for natural feel */
+    src.playbackRate.value = 0.95 + Math.random() * 0.1;
+    const gain = audioCtx.createGain();
+    gain.gain.value = vol;
+    src.connect(gain);
+    gain.connect(audioCtx.destination);
+    src.start(audioCtx.currentTime, slice.start, slice.duration);
+  } else {
+    /* Fallback: simple synthetic click */
+    playsyntheticClack(vol);
+  }
+}
+
+function playsyntheticClack(vol) {
   const now = audioCtx.currentTime;
   const rate = audioCtx.sampleRate;
-
-  /* Configurable parameters (0–100 range) */
-  const tone = settings.soundTone / 100;   /* 0 = dark/warm, 1 = bright */
-  const snap = settings.soundSnap / 100;   /* 0 = no snap, 1 = hard click */
-  const body = settings.soundBody / 100;   /* 0 = no resonance, 1 = heavy */
-
-  /*
-   * Split-flap flutter: a thin flap of plastic/metal rotating through air
-   * and landing against the next stop. The cascading waterfall comes from
-   * many of these overlapping with stagger.
-   */
-
-  /* Layer 1: Flutter — longer, softer noise shaped by tone */
-  const flutterDur = 0.04 + (1 - tone) * 0.03; /* longer overall — darker = breathier */
-  const flutterLen = Math.floor(rate * flutterDur);
-  const flutterBuf = audioCtx.createBuffer(1, flutterLen, rate);
-  const flutterData = flutterBuf.getChannelData(0);
-  for (let i = 0; i < flutterLen; i++) {
-    /* Soft attack, very gentle decay — longer tail */
-    const t = i / flutterLen;
-    const env = Math.sin(t * Math.PI * 0.8) * Math.pow(1 - t, 1.0);
-    flutterData[i] = (Math.random() * 2 - 1) * env;
+  const dur = 0.04;
+  const len = Math.floor(rate * dur);
+  const buf = audioCtx.createBuffer(1, len, rate);
+  const d = buf.getChannelData(0);
+  for (let i = 0; i < len; i++) {
+    const t = i / len;
+    d[i] = (Math.random() * 2 - 1) * Math.pow(1 - t, 2);
   }
-  const flutterSrc = audioCtx.createBufferSource();
-  flutterSrc.buffer = flutterBuf;
-
-  /* Tone controls the filter center — low tone = warm rumble, high = airy hiss */
-  const hpFreq = 200 + tone * 1800;
-  const bpFreq = 600 + tone * 3600 + Math.random() * 600;
-
-  const hp = audioCtx.createBiquadFilter();
-  hp.type = 'highpass';
-  hp.frequency.value = hpFreq;
-  hp.Q.value = 0.25;
-
-  const bp = audioCtx.createBiquadFilter();
-  bp.type = 'bandpass';
-  bp.frequency.value = bpFreq;
-  bp.Q.value = 0.25 + tone * 0.3;
-
-  const flutterGain = audioCtx.createGain();
-  flutterGain.gain.setValueAtTime(vol * 0.16, now);
-  flutterGain.gain.exponentialRampToValueAtTime(0.001, now + flutterDur + 0.015);
-
-  flutterSrc.connect(hp);
-  hp.connect(bp);
-  bp.connect(flutterGain);
-  flutterGain.connect(audioCtx.destination);
-  flutterSrc.start(now);
-  flutterSrc.stop(now + flutterDur + 0.02);
-
-  /* Layer 2: Snap — the flap hitting the stop. Controlled by snap parameter.
-     Softer overall — less sharp transient, longer decay. */
-  if (snap > 0.05) {
-    const snapDur = 0.008 + snap * 0.014;
-    const snapLen = Math.floor(rate * snapDur);
-    const snapBuf = audioCtx.createBuffer(1, snapLen, rate);
-    const snapData = snapBuf.getChannelData(0);
-    for (let i = 0; i < snapLen; i++) {
-      snapData[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / snapLen, 2 + snap * 3);
-    }
-    const snapSrc = audioCtx.createBufferSource();
-    snapSrc.buffer = snapBuf;
-
-    const snapBp = audioCtx.createBiquadFilter();
-    snapBp.type = 'bandpass';
-    snapBp.frequency.value = 400 + tone * 2400 + Math.random() * 500;
-    snapBp.Q.value = 0.4 + snap * 1.0;
-
-    const snapGainNode = audioCtx.createGain();
-    const snapVol = vol * snap * 0.10;
-    snapGainNode.gain.setValueAtTime(snapVol, now);
-    snapGainNode.gain.exponentialRampToValueAtTime(0.001, now + snapDur + 0.008);
-
-    snapSrc.connect(snapBp);
-    snapBp.connect(snapGainNode);
-    snapGainNode.connect(audioCtx.destination);
-    snapSrc.start(now);
-    snapSrc.stop(now + snapDur + 0.012);
-  }
-
-  /* Layer 3: Body resonance — the housing vibrating. Controlled by body parameter.
-     Longer sustain for a warmer, more rounded sound. */
-  if (body > 0.05) {
-    const bodyOsc = audioCtx.createOscillator();
-    bodyOsc.type = 'sine';
-    bodyOsc.frequency.value = 55 + body * 70 + Math.random() * 25;
-    const bodyDur = 0.04 + body * 0.07;
-
-    const bodyGainNode = audioCtx.createGain();
-    const bodyVol = vol * body * 0.07;
-    bodyGainNode.gain.setValueAtTime(bodyVol, now);
-    bodyGainNode.gain.exponentialRampToValueAtTime(0.001, now + bodyDur);
-
-    bodyOsc.connect(bodyGainNode);
-    bodyGainNode.connect(audioCtx.destination);
-    bodyOsc.start(now);
-    bodyOsc.stop(now + bodyDur + 0.01);
-  }
+  const src = audioCtx.createBufferSource();
+  src.buffer = buf;
+  const gain = audioCtx.createGain();
+  gain.gain.setValueAtTime(vol * 0.15, now);
+  gain.gain.exponentialRampToValueAtTime(0.001, now + dur);
+  src.connect(gain);
+  gain.connect(audioCtx.destination);
+  src.start(now);
+  src.stop(now + dur + 0.01);
 }
 
 /* ══════════════════════════════════════════
