@@ -1762,10 +1762,10 @@ function detectFlaps(buffer) {
   const data = buffer.getChannelData(0);
   const rate = buffer.sampleRate;
   const windowSize = Math.floor(rate * 0.01); /* 10ms windows */
-  const threshold = 0.05;
+  const threshold = 0.035;
   const minGap = Math.floor(rate * 0.08); /* min 80ms between flaps */
-  const slicePad = Math.floor(rate * 0.02); /* 20ms padding before peak */
-  const sliceDur = Math.floor(rate * 0.15); /* 150ms per slice */
+  const slicePad = Math.floor(rate * 0.015); /* 15ms padding before peak */
+  const sliceDur = Math.floor(rate * 0.10); /* 100ms per slice */
   const slices = [];
   let lastPeak = -minGap;
 
