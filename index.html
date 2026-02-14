@@ -2418,7 +2418,7 @@ function applyGrid(newGrid, immediate, opts) {
     let useExtraFlips = (opts && opts.extraFlips != null) ? opts.extraFlips : extraFlips;
     if (dir === 'waterfall') {
       useStagger = 200; /* small overlap delay — rows start before the previous finishes */
-      useJitter = 0;
+      useJitter = 25; /* small per-cell jitter so they don't all fire at once */
     } else if (dir === 'waterfall-extra') {
       useExtraFlips = 40;
       useStagger = flipSpeed + useExtraFlips * flipSpeed * 0.35 + 50;
