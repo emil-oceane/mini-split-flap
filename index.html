@@ -557,6 +557,82 @@ body {
   pointer-events: auto;
 }
 
+/* Audio prompt modal */
+.audio-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.6);
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+  animation: audioModalFadeIn 0.3s ease;
+}
+@keyframes audioModalFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+.audio-modal {
+  background: #1a1a1a;
+  border: 1px solid #333;
+  border-radius: 12px;
+  padding: 28px 32px;
+  max-width: 320px;
+  text-align: center;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+  animation: audioModalSlideIn 0.3s ease;
+}
+@keyframes audioModalSlideIn {
+  from { opacity: 0; transform: translateY(12px) scale(0.97); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+.audio-modal h3 {
+  margin: 0 0 8px;
+  font-size: 16px;
+  color: #eee;
+  font-weight: 600;
+}
+.audio-modal p {
+  margin: 0 0 20px;
+  font-size: 13px;
+  color: #999;
+  line-height: 1.4;
+}
+.audio-modal-buttons {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+}
+.audio-modal-buttons button {
+  padding: 8px 20px;
+  border-radius: 8px;
+  border: none;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s, transform 0.1s;
+}
+.audio-modal-buttons button:active {
+  transform: scale(0.97);
+}
+.audio-modal-buttons .btn-enable {
+  background: var(--accent-dim, #b8860b);
+  color: #fff;
+}
+.audio-modal-buttons .btn-enable:hover {
+  background: var(--accent, #daa520);
+}
+.audio-modal-buttons .btn-dismiss {
+  background: #333;
+  color: #aaa;
+}
+.audio-modal-buttons .btn-dismiss:hover {
+  background: #444;
+  color: #ccc;
+}
+
 .config-drawer {
   position: fixed;
   top: 0;
@@ -1185,9 +1261,9 @@ body.theme-green {
     <div class="config-row" id="drumSpeedRow">
       <span class="config-label">Drum Speed</span>
       <div class="config-slider-wrap">
-        <input type="range" id="cfgDrumSpeed" min="1" max="8" value="3" step="0.5">
+        <input type="range" id="cfgDrumSpeed" min="1" max="8" value="6" step="0.5">
       </div>
-      <span class="config-value" id="cfgDrumSpeedVal">3s</span>
+      <span class="config-value" id="cfgDrumSpeedVal">6s</span>
     </div>
     <div class="config-row" id="skipFlipsRow" style="display:none">
       <span class="config-label">Skip Flips</span>
@@ -1239,6 +1315,13 @@ body.theme-green {
         <input type="range" id="cfgSoundBody" min="0" max="100" value="35" step="5">
       </div>
       <span class="config-value" id="cfgSoundBodyVal">35</span>
+    </div>
+    <div class="config-row">
+      <span class="config-label">Room</span>
+      <div class="config-slider-wrap">
+        <input type="range" id="cfgSoundRoom" min="0" max="100" value="30" step="5">
+      </div>
+      <span class="config-value" id="cfgSoundRoomVal">30</span>
     </div>
     <div style="margin-top:6px;">
       <button class="config-btn small" id="btnSoundTest">Test Sound</button>
@@ -1306,6 +1389,18 @@ body.theme-green {
   </div>
 </div>
 
+<!-- ═══ AUDIO PROMPT MODAL ═══ -->
+<div class="audio-modal-overlay" id="audioModal" style="display:none">
+  <div class="audio-modal">
+    <h3>Enable Sound?</h3>
+    <p>This display sounds best with audio. Enable mechanical flap sounds?</p>
+    <div class="audio-modal-buttons">
+      <button class="btn-enable" id="audioModalEnable">Enable Audio</button>
+      <button class="btn-dismiss" id="audioModalDismiss">No Thanks</button>
+    </div>
+  </div>
+</div>
+
 <!-- ═══════════════════════════════════════════════ -->
 <script>
 /* ══════════════════════════════════════════
@@ -1342,15 +1437,16 @@ let settings = {
   cellSize: 85,
   flipSpeed: 250,
   stagger: 22,
-  flipDirection: 'down',
+  flipDirection: 'waterfall',
   jitter: 15,
   extraFlips: 2,
   realisticFlips: true,
-  drumSpeed: 3,
+  drumSpeed: 6,
   volume: 35,
   soundTone: 25,
   soundSnap: 15,
   soundBody: 45,
+  soundRoom: 30,
   soundPreset: 'waterfall',
   muted: true,
   theme: '',
@@ -1371,9 +1467,17 @@ const activeFlips = new Map();
 let animLoopRunning = false;
 /* Pending stagger timeouts — cleared when a new applyGrid is called */
 let pendingFlipTimeouts = [];
+/* Callback when all flips (including staggered) finish */
+let onAllFlipsComplete = null;
 /* Audio */
 let audioCtx = null;
 let audioUnlocked = false;
+/* Persistent audio graph nodes */
+let masterInput = null;
+let masterGain = null;
+let dryGain = null;
+let wetGain = null;
+let reverbNode = null;
 /* Auto-rotate */
 let autoRotateTimer = null;
 let autoRotateIndex = 0;
@@ -1553,8 +1657,8 @@ function getCachedLocation() {
     const cached = localStorage.getItem('splitFlap_location');
     if (cached) {
       const { latitude, longitude, city, ts } = JSON.parse(cached);
-      /* Cache valid for 1 hour */
-      if (Date.now() - ts < 3600000 && latitude && longitude) {
+      /* Cache valid for 30 days — avoids repeated geolocation prompts */
+      if (Date.now() - ts < 2592000000 && latitude && longitude) {
         return { latitude, longitude, city };
       }
     }
@@ -1745,11 +1849,62 @@ const FLAP_SAMPLE_B64 = "UklGRvDyBwBXQVZFZm10IBAAAAABAAIAgLsAAADuAgAEABAAZGF0Ycz
 let flapBuffer = null;
 let flapSlices = [];
 
+function generateImpulseResponse(ctx, duration, decay) {
+  const rate = ctx.sampleRate;
+  const len = Math.floor(rate * duration);
+  const buf = ctx.createBuffer(2, len, rate);
+  const earlyEnd = Math.floor(rate * 0.03); /* first 30ms for early reflections */
+  for (let ch = 0; ch < 2; ch++) {
+    const d = buf.getChannelData(ch);
+    for (let i = 0; i < len; i++) {
+      const t = i / len;
+      let envelope = Math.pow(1 - t, decay);
+      /* Boost early reflections for room presence */
+      if (i < earlyEnd) {
+        envelope *= 1.5 + 0.5 * Math.cos(Math.PI * i / earlyEnd);
+      }
+      d[i] = (Math.random() * 2 - 1) * envelope;
+    }
+  }
+  return buf;
+}
+
+function updateReverbMix() {
+  if (!dryGain || !wetGain) return;
+  const room = settings.soundRoom / 100;
+  dryGain.gain.value = 1 - room * 0.4;
+  /* Cap wet at 0.6 to prevent wash-out */
+  wetGain.gain.value = Math.min(0.6, room * 0.8);
+}
+
 function initAudio() {
   if (audioCtx) return;
   try {
     audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     audioUnlocked = true;
+
+    /* Build persistent master chain:
+       masterInput → dryGain ────────────┐
+                   → convolver → wetGain ─┤→ masterGain → destination */
+    masterInput = audioCtx.createGain();
+    masterGain = audioCtx.createGain();
+    dryGain = audioCtx.createGain();
+    wetGain = audioCtx.createGain();
+
+    /* Dry path */
+    masterInput.connect(dryGain);
+    dryGain.connect(masterGain);
+
+    /* Wet (reverb) path */
+    reverbNode = audioCtx.createConvolver();
+    reverbNode.buffer = generateImpulseResponse(audioCtx, 1.2, 3.5);
+    masterInput.connect(reverbNode);
+    reverbNode.connect(wetGain);
+    wetGain.connect(masterGain);
+
+    masterGain.connect(audioCtx.destination);
+
+    updateReverbMix();
     loadFlapSample();
   } catch (e) {
     console.warn('WebAudio not available');
@@ -1797,30 +1952,87 @@ function detectFlaps(buffer) {
   return slices;
 }
 
-function playClack(volume) {
+function playClack(volume, col, totalCols, row, totalRows) {
   if (!audioCtx || !audioUnlocked || settings.muted || prefersReducedMotion) return;
   const vol = (volume != null ? volume : settings.volume) / 100;
   if (vol <= 0) return;
 
   if (flapBuffer && flapSlices.length > 0) {
-    /* Play a random real flap slice */
+    const now = audioCtx.currentTime;
+    /* Per-column micro-delay within a row for cascading spread (0-6ms) */
+    const microDelay = (col != null && totalCols > 1)
+      ? (col / (totalCols - 1)) * 0.006 + Math.random() * 0.002
+      : Math.random() * 0.004;
+    const startTime = now + microDelay;
+
     const slice = flapSlices[Math.floor(Math.random() * flapSlices.length)];
     const src = audioCtx.createBufferSource();
     src.buffer = flapBuffer;
-    /* Slight pitch variation for natural feel */
-    src.playbackRate.value = 0.95 + Math.random() * 0.1;
+    /* Row-based pitch: slight descending pitch per row for waterfall depth */
+    const rowFrac = (row != null && totalRows > 1) ? row / (totalRows - 1) : 0.5;
+    src.playbackRate.value = (0.98 - rowFrac * 0.06) + Math.random() * 0.08;
+
+    /* Tone filter — lowpass: 800Hz (dark) to 12000Hz (bright) */
+    const toneFrac = settings.soundTone / 100;
+    const toneFilter = audioCtx.createBiquadFilter();
+    toneFilter.type = 'lowpass';
+    toneFilter.frequency.value = 800 + toneFrac * 11200;
+    toneFilter.Q.value = 0.7;
+
+    /* Body filter — peaking EQ at 400Hz: -6dB to +12dB */
+    const bodyFrac = settings.soundBody / 100;
+    const bodyFilter = audioCtx.createBiquadFilter();
+    bodyFilter.type = 'peaking';
+    bodyFilter.frequency.value = 400;
+    bodyFilter.Q.value = 1;
+    bodyFilter.gain.value = -6 + bodyFrac * 18;
+
+    /* Snap filter — highshelf at 3kHz: 0 to +8dB, with attack envelope */
+    const snapFrac = settings.soundSnap / 100;
+    const snapFilter = audioCtx.createBiquadFilter();
+    snapFilter.type = 'highshelf';
+    snapFilter.frequency.value = 3000;
+    snapFilter.gain.value = snapFrac * 8;
+
+    /* Stereo panner — spread columns across -0.7 to +0.7 */
+    const panner = audioCtx.createStereoPanner();
+    if (col != null && totalCols > 1) {
+      panner.pan.value = -0.7 + (col / (totalCols - 1)) * 1.4;
+    } else {
+      panner.pan.value = (Math.random() - 0.5) * 0.6;
+    }
+
+    /* Volume ducking — every flap plays, louder rows build the cascade */
+    const concurrent = activeFlips.size || 1;
+    const duckFactor = Math.max(0.3, 1.0 / Math.sqrt(concurrent / 8));
+    /* Row crescendo: earlier rows slightly quieter, later rows build up */
+    const rowGain = 0.7 + rowFrac * 0.3;
+    const jitter = 0.85 + Math.random() * 0.3;
+
     const gain = audioCtx.createGain();
-    gain.gain.value = vol;
-    src.connect(gain);
-    gain.connect(audioCtx.destination);
-    src.start(audioCtx.currentTime, slice.start, slice.duration);
+    /* Snap attack envelope: sharper attack at higher snap values */
+    const attackMul = 1.0 + snapFrac * 1.5;
+    gain.gain.setValueAtTime(vol * duckFactor * rowGain * jitter * attackMul, startTime);
+    gain.gain.exponentialRampToValueAtTime(
+      Math.max(0.001, vol * duckFactor * rowGain * jitter),
+      startTime + 0.008
+    );
+
+    /* Chain: src → tone → body → snap → panner → gain → masterInput */
+    src.connect(toneFilter);
+    toneFilter.connect(bodyFilter);
+    bodyFilter.connect(snapFilter);
+    snapFilter.connect(panner);
+    panner.connect(gain);
+    gain.connect(masterInput || audioCtx.destination);
+
+    src.start(startTime, slice.start, slice.duration);
   } else {
-    /* Fallback: simple synthetic click */
-    playsyntheticClack(vol);
+    playsyntheticClack(vol, col, totalCols);
   }
 }
 
-function playsyntheticClack(vol) {
+function playsyntheticClack(vol, col, totalCols) {
   const now = audioCtx.currentTime;
   const rate = audioCtx.sampleRate;
   const dur = 0.04;
@@ -1833,11 +2045,18 @@ function playsyntheticClack(vol) {
   }
   const src = audioCtx.createBufferSource();
   src.buffer = buf;
+  const panner = audioCtx.createStereoPanner();
+  if (col != null && totalCols > 1) {
+    panner.pan.value = -0.7 + (col / (totalCols - 1)) * 1.4;
+  } else {
+    panner.pan.value = (Math.random() - 0.5) * 0.6;
+  }
   const gain = audioCtx.createGain();
   gain.gain.setValueAtTime(vol * 0.15, now);
   gain.gain.exponentialRampToValueAtTime(0.001, now + dur);
-  src.connect(gain);
-  gain.connect(audioCtx.destination);
+  src.connect(panner);
+  panner.connect(gain);
+  gain.connect(masterInput || audioCtx.destination);
   src.start(now);
   src.stop(now + dur + 0.01);
 }
@@ -2009,11 +2228,7 @@ function updateFlip(key, state, timestamp) {
   if (progress >= 0.5 && !state.midpointDone) {
     state.midpointDone = true;
     setCellContent(ref.upper, state.nextToken);
-    /* Throttle sound: allow more through for the cascading waterfall effect */
-    const soundProb = Math.max(0.15, Math.min(1, 20 / Math.max(1, activeFlips.size)));
-    if (Math.random() < soundProb) {
-      playClack();
-    }
+    playClack(null, state.col, settings.cols, state.row, settings.rows);
   }
 
   /* Complete this flip */
@@ -2039,6 +2254,12 @@ function updateFlip(key, state, timestamp) {
       /* Final — update currentGrid */
       currentGrid[state.row][state.col] = state.nextToken;
       activeFlips.delete(key);
+      /* If all flips done and no pending staggers, fire completion */
+      if (activeFlips.size === 0 && pendingFlipTimeouts.length === 0 && onAllFlipsComplete) {
+        const cb = onAllFlipsComplete;
+        onAllFlipsComplete = null;
+        cb();
+      }
     }
   }
 }
@@ -2145,10 +2366,14 @@ function applyGrid(newGrid, immediate, opts) {
       setStaticCell(ch.row, ch.col, ch.to);
       currentGrid[ch.row][ch.col] = ch.to;
     }
+    if (onAllFlipsComplete) { const cb = onAllFlipsComplete; onAllFlipsComplete = null; cb(); }
     return;
   }
 
-  if (changes.length === 0) return;
+  if (changes.length === 0) {
+    if (onAllFlipsComplete) { const cb = onAllFlipsComplete; onAllFlipsComplete = null; cb(); }
+    return;
+  }
 
   /* Cancel any pending stagger timeouts from previous applyGrid */
   for (const tid of pendingFlipTimeouts) clearTimeout(tid);
@@ -2192,11 +2417,7 @@ function applyGrid(newGrid, immediate, opts) {
     let useJitter = (opts && opts.jitter != null) ? opts.jitter : jitter;
     let useExtraFlips = (opts && opts.extraFlips != null) ? opts.extraFlips : extraFlips;
     if (dir === 'waterfall') {
-      if (settings.realisticFlips) {
-        useStagger = settings.drumSpeed * 1000 * 0.5 + 50; /* half a drum rotation per row */
-      } else {
-        useStagger = flipSpeed + extraFlips * flipSpeed * 0.35 + 50;
-      }
+      useStagger = 200; /* small overlap delay — rows start before the previous finishes */
       useJitter = 0;
     } else if (dir === 'waterfall-extra') {
       useExtraFlips = 40;
@@ -2215,6 +2436,9 @@ function applyGrid(newGrid, immediate, opts) {
       : flipSpeed + (Math.random() - 0.5) * flipSpeed * 0.2;
 
     const tid = setTimeout(() => {
+      /* Remove from pending list now that it's fired */
+      const idx = pendingFlipTimeouts.indexOf(tid);
+      if (idx >= 0) pendingFlipTimeouts.splice(idx, 1);
       /* Reset settle transform */
       ref.inner.style.transform = '';
       beginSingleFlip(key, ref, ch.row, ch.col, ch.from, firstTarget, queue, dur);
@@ -2350,31 +2574,49 @@ function updateClock() {
 /* ══════════════════════════════════════════
    AUTO-ROTATE
    ══════════════════════════════════════════ */
+function scheduleNextScene() {
+  stopAutoRotate();
+  if (!settings.autoRotate || autoRotatePaused) return;
+  /* Wait for the configured interval, then advance */
+  autoRotateTimer = setTimeout(() => {
+    autoRotateTimer = null;
+    if (!settings.autoRotate || autoRotatePaused) return;
+    const all = getAllScenes();
+    autoRotateIndex = (autoRotateIndex + 1) % all.length;
+    applySceneByIndex(autoRotateIndex);
+    /* After applying, wait for all flips to complete before scheduling next */
+    onAllFlipsComplete = scheduleNextScene;
+  }, settings.autoRotateInterval * 1000);
+}
+
 function startAutoRotate() {
   stopAutoRotate();
   if (!settings.autoRotate) return;
   autoRotateIndex = settings.activeSceneIndex;
-  autoRotateTimer = setInterval(() => {
-    if (autoRotatePaused) return;
-    /* Wait for ongoing animations to finish before advancing */
-    if (activeFlips.size > 0) return;
-    const all = getAllScenes();
-    autoRotateIndex = (autoRotateIndex + 1) % all.length;
-    applySceneByIndex(autoRotateIndex);
-  }, settings.autoRotateInterval * 1000);
+  /* If flips are already running, wait for them; otherwise schedule immediately */
+  if (activeFlips.size > 0 || pendingFlipTimeouts.length > 0) {
+    onAllFlipsComplete = scheduleNextScene;
+  } else {
+    scheduleNextScene();
+  }
 }
 
 function stopAutoRotate() {
   if (autoRotateTimer) {
-    clearInterval(autoRotateTimer);
+    clearTimeout(autoRotateTimer);
     autoRotateTimer = null;
   }
+  onAllFlipsComplete = null;
 }
 
 function pauseAutoRotateTemporarily() {
   autoRotatePaused = true;
+  stopAutoRotate();
   clearTimeout(window._autoResume);
-  window._autoResume = setTimeout(() => { autoRotatePaused = false; }, 5000);
+  window._autoResume = setTimeout(() => {
+    autoRotatePaused = false;
+    if (settings.autoRotate) startAutoRotate();
+  }, 5000);
 }
 
 /* ══════════════════════════════════════════
@@ -2416,10 +2658,11 @@ function setupConfigUI() {
     { id: 'cfgSoundTone', key: 'soundTone', valId: 'cfgSoundToneVal', fmt: v => v, sound: true },
     { id: 'cfgSoundSnap', key: 'soundSnap', valId: 'cfgSoundSnapVal', fmt: v => v, sound: true },
     { id: 'cfgSoundBody', key: 'soundBody', valId: 'cfgSoundBodyVal', fmt: v => v, sound: true },
+    { id: 'cfgSoundRoom', key: 'soundRoom', valId: 'cfgSoundRoomVal', fmt: v => v, sound: true, room: true },
     { id: 'cfgAutoInterval', key: 'autoRotateInterval', valId: 'cfgAutoIntervalVal', fmt: v => v + 's' },
   ];
 
-  sliders.forEach(({ id, key, valId, fmt, rebuild, sound }) => {
+  sliders.forEach(({ id, key, valId, fmt, rebuild, sound, room }) => {
     const input = document.getElementById(id);
     const valEl = document.getElementById(valId);
     input.value = settings[key];
@@ -2443,16 +2686,19 @@ function setupConfigUI() {
         document.getElementById('cfgSoundPreset').value = 'custom';
         saveSettings();
       }
+      if (room) {
+        updateReverbMix();
+      }
     });
   });
 
   /* Sound presets */
   const SOUND_PRESETS = {
-    waterfall:  { soundTone: 25, soundSnap: 15, soundBody: 45 },
-    mechanical: { soundTone: 45, soundSnap: 75, soundBody: 60 },
-    soft:       { soundTone: 15, soundSnap: 5,  soundBody: 20 },
-    crisp:      { soundTone: 75, soundSnap: 65, soundBody: 10 },
-    heavy:      { soundTone: 25, soundSnap: 90, soundBody: 85 },
+    waterfall:  { soundTone: 25, soundSnap: 15, soundBody: 45, soundRoom: 35 },
+    mechanical: { soundTone: 45, soundSnap: 75, soundBody: 60, soundRoom: 15 },
+    soft:       { soundTone: 15, soundSnap: 5,  soundBody: 20, soundRoom: 50 },
+    crisp:      { soundTone: 75, soundSnap: 65, soundBody: 10, soundRoom: 10 },
+    heavy:      { soundTone: 25, soundSnap: 90, soundBody: 85, soundRoom: 25 },
   };
 
   function applySoundPreset(name) {
@@ -2461,6 +2707,7 @@ function setupConfigUI() {
     settings.soundTone = preset.soundTone;
     settings.soundSnap = preset.soundSnap;
     settings.soundBody = preset.soundBody;
+    settings.soundRoom = preset.soundRoom;
     settings.soundPreset = name;
     /* Update slider UI */
     document.getElementById('cfgSoundTone').value = preset.soundTone;
@@ -2469,6 +2716,9 @@ function setupConfigUI() {
     document.getElementById('cfgSoundSnapVal').textContent = preset.soundSnap;
     document.getElementById('cfgSoundBody').value = preset.soundBody;
     document.getElementById('cfgSoundBodyVal').textContent = preset.soundBody;
+    document.getElementById('cfgSoundRoom').value = preset.soundRoom;
+    document.getElementById('cfgSoundRoomVal').textContent = preset.soundRoom;
+    updateReverbMix();
     saveSettings();
   }
 
@@ -2483,9 +2733,12 @@ function setupConfigUI() {
   /* Test sound button */
   document.getElementById('btnSoundTest').addEventListener('click', () => {
     initAudio();
-    /* Fire a burst of flaps with stagger to preview the cascading effect */
-    for (let i = 0; i < 8; i++) {
-      setTimeout(() => playClack(), i * 30);
+    /* Simulate cascading rows: 3 rows of 8 columns with row delay */
+    const testRows = 3, testCols = 8, rowDelay = 120;
+    for (let r = 0; r < testRows; r++) {
+      for (let c = 0; c < testCols; c++) {
+        setTimeout(() => playClack(null, c, testCols, r, testRows), r * rowDelay + c * 8);
+      }
     }
   });
 
@@ -2928,19 +3181,72 @@ function init() {
     }, 300);
   });
 
-  /* Audio unlock on first interaction (browser autoplay policy) */
-  const unlockAudio = () => {
-    initAudio();
-    if (audioCtx && audioCtx.state === 'suspended') {
-      audioCtx.resume();
+  /* Start the board flipping — called immediately or after modal dismissal */
+  function startBoard() {
+    const all = getAllScenes();
+    const idx = Math.min(settings.activeSceneIndex, all.length - 1);
+    setTimeout(() => {
+      if (all[idx]) {
+        applyScene(all[idx]);
+        if (all[idx].live) startLiveUpdates();
+      }
+    }, 400);
+    if (settings.autoRotate) {
+      setTimeout(() => startAutoRotate(), 2000);
     }
-    document.removeEventListener('click', unlockAudio);
-    document.removeEventListener('touchstart', unlockAudio);
-    document.removeEventListener('keydown', unlockAudio);
-  };
-  document.addEventListener('click', unlockAudio);
-  document.addEventListener('touchstart', unlockAudio);
-  document.addEventListener('keydown', unlockAudio);
+  }
+
+  /* Audio prompt modal */
+  const audioModal = document.getElementById('audioModal');
+  const dismissModal = () => { audioModal.style.display = 'none'; };
+
+  document.getElementById('audioModalEnable').addEventListener('click', () => {
+    initAudio();
+    if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+    settings.muted = false;
+    updateMuteIcon();
+    saveSettings();
+    localStorage.setItem('splitFlap_audioPromptSeen', '1');
+    dismissModal();
+    startBoard();
+  });
+
+  document.getElementById('audioModalDismiss').addEventListener('click', () => {
+    /* Don't create AudioContext here — user declined audio.
+       It will be lazily initialized on a future user gesture (mute toggle, etc.) */
+    settings.muted = true;
+    updateMuteIcon();
+    saveSettings();
+    localStorage.setItem('splitFlap_audioPromptSeen', '1');
+    dismissModal();
+    startBoard();
+  });
+
+  /* Check if AudioContext requires a user gesture */
+  const audioPromptSeen = localStorage.getItem('splitFlap_audioPromptSeen');
+  let needsModal = false;
+
+  if (!audioPromptSeen) {
+    needsModal = true;
+  }
+
+  if (needsModal) {
+    /* Show modal and hold the board until user responds */
+    audioModal.style.display = '';
+  } else {
+    /* Returning user or AudioContext already allowed — start immediately */
+    const unlockAudio = () => {
+      initAudio();
+      if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+      document.removeEventListener('click', unlockAudio);
+      document.removeEventListener('touchstart', unlockAudio);
+      document.removeEventListener('keydown', unlockAudio);
+    };
+    document.addEventListener('click', unlockAudio);
+    document.addEventListener('touchstart', unlockAudio);
+    document.addEventListener('keydown', unlockAudio);
+    startBoard();
+  }
 
   /* Keyboard shortcuts */
   document.addEventListener('keydown', (e) => {
@@ -2965,20 +3271,6 @@ function init() {
     pauseAutoRotateTemporarily();
   });
 
-  /* Apply first scene with animation after a short delay */
-  const all = getAllScenes();
-  const idx = Math.min(settings.activeSceneIndex, all.length - 1);
-  setTimeout(() => {
-    if (all[idx]) {
-      applyScene(all[idx]);
-      if (all[idx].live) startLiveUpdates();
-    }
-  }, 400);
-
-  /* Start auto-rotate if enabled */
-  if (settings.autoRotate) {
-    setTimeout(() => startAutoRotate(), 2000);
-  }
 }
 
 /* Kick it off */
