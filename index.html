@@ -509,7 +509,11 @@ body {
   z-index: 2;
   opacity: 0;
   pointer-events: none;
-  will-change: opacity, transform;
+  /* NOTE: no `will-change` here. This element exists in every cell (up to
+     1000 on large boards). A permanent will-change promotes each one to its
+     own compositor layer, exhausting GPU memory and crippling mobile. The
+     flap itself (.cell-flap) is display:none when idle, so it only creates
+     a layer while actually animating — that is the correct, bounded cost. */
 }
 
 /* Cell gloss highlight */
@@ -996,6 +1000,36 @@ input[type="checkbox"]:checked::after {
   .board-inner { padding: 10px 12px; }
   .config-drawer { width: 100%; max-width: 100%; }
   .board-header-title { font-size: 10px; letter-spacing: 2px; }
+
+  /* Use the dynamic viewport unit so the board fits between the mobile
+     browser's collapsing toolbars instead of being clipped by them. */
+  html, body { height: 100dvh; }
+  #app { height: 100dvh; }
+
+  /* Bigger tap targets — 28px icon buttons are hard to hit with a thumb. */
+  .icon-btn { width: 40px; height: 40px; }
+  .icon-btn svg { width: 20px; height: 20px; }
+
+  /* Fatter slider track + thumb for touch dragging. */
+  input[type="range"] { height: 6px; }
+  input[type="range"]::-webkit-slider-thumb { width: 24px; height: 24px; }
+  input[type="range"]::-moz-range-thumb { width: 24px; height: 24px; }
+
+  /* Roomier config rows and momentum scrolling inside the drawer. */
+  .config-drawer { -webkit-overflow-scrolling: touch; }
+  .config-row { padding: 10px 0; }
+  .config-select { min-height: 40px; }
+
+  /* Keep the audio prompt off the screen edges and give it tappable buttons. */
+  .audio-modal { max-width: calc(100vw - 32px); padding: 24px; }
+  .audio-modal-buttons button { padding: 12px 20px; min-height: 44px; }
+}
+
+/* Coarse-pointer (touch) devices regardless of width: kill hover-only affordances. */
+@media (hover: none) {
+  .icon-btn:hover { background: transparent; color: var(--text-secondary); }
+  input[type="range"]::-webkit-slider-thumb:hover { transform: none; }
+  .theme-swatch:hover { transform: none; }
 }
 
 /* ══════════════════════════════════════════
@@ -1478,6 +1512,16 @@ let masterGain = null;
 let dryGain = null;
 let wetGain = null;
 let reverbNode = null;
+/* Shared EQ filters — identical for every clack, so they live once in the
+   master chain instead of being rebuilt per voice. */
+let toneFilter = null;
+let bodyFilter = null;
+let snapFilter = null;
+/* Voice budget: caps simultaneous clack sources so a full-board flip (which
+   can request thousands of clacks in a burst) can never explode the audio
+   graph. Excess clacks are dropped silently — the visual flip is unaffected. */
+let activeVoices = 0;
+const MAX_VOICES = 28;
 /* Auto-rotate */
 let autoRotateTimer = null;
 let autoRotateIndex = 0;
@@ -1877,52 +1921,109 @@ function updateReverbMix() {
   wetGain.gain.value = Math.min(0.6, room * 0.8);
 }
 
+/* Push the tone/body/snap settings into the shared EQ filters. These are the
+   same for every clack, so they live once in the master chain rather than
+   being rebuilt (3 BiquadFilters) on every single voice. */
+function updateSoundFilters() {
+  if (!toneFilter || !bodyFilter || !snapFilter) return;
+  const toneFrac = settings.soundTone / 100;
+  const bodyFrac = settings.soundBody / 100;
+  const snapFrac = settings.soundSnap / 100;
+  /* Lowpass: 800Hz (dark) → 12000Hz (bright) */
+  toneFilter.frequency.value = 800 + toneFrac * 11200;
+  /* Peaking EQ at 400Hz: -6dB → +12dB */
+  bodyFilter.gain.value = -6 + bodyFrac * 18;
+  /* Highshelf at 3kHz: 0 → +8dB */
+  snapFilter.gain.value = snapFrac * 8;
+}
+
 function initAudio() {
   if (audioCtx) return;
   try {
     audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     audioUnlocked = true;
 
-    /* Build persistent master chain:
-       masterInput → dryGain ────────────┐
-                   → convolver → wetGain ─┤→ masterGain → destination */
+    /* Build persistent master chain. The EQ filters are shared (identical for
+       every clack — biquads are linear, so EQ(sum) == sum(EQ), making this
+       mathematically equivalent to per-voice filtering but vastly cheaper):
+         masterInput → tone → body → snap ─┬─ dryGain ───────────┐
+                                           └─ convolver → wetGain ┤→ masterGain → destination */
     masterInput = audioCtx.createGain();
     masterGain = audioCtx.createGain();
     dryGain = audioCtx.createGain();
     wetGain = audioCtx.createGain();
 
+    toneFilter = audioCtx.createBiquadFilter();
+    toneFilter.type = 'lowpass';
+    toneFilter.Q.value = 0.7;
+    bodyFilter = audioCtx.createBiquadFilter();
+    bodyFilter.type = 'peaking';
+    bodyFilter.frequency.value = 400;
+    bodyFilter.Q.value = 1;
+    snapFilter = audioCtx.createBiquadFilter();
+    snapFilter.type = 'highshelf';
+    snapFilter.frequency.value = 3000;
+
+    masterInput.connect(toneFilter);
+    toneFilter.connect(bodyFilter);
+    bodyFilter.connect(snapFilter);
+
     /* Dry path */
-    masterInput.connect(dryGain);
+    snapFilter.connect(dryGain);
     dryGain.connect(masterGain);
 
     /* Wet (reverb) path */
     reverbNode = audioCtx.createConvolver();
     reverbNode.buffer = generateImpulseResponse(audioCtx, 1.2, 3.5);
-    masterInput.connect(reverbNode);
+    snapFilter.connect(reverbNode);
     reverbNode.connect(wetGain);
     wetGain.connect(masterGain);
 
     masterGain.connect(audioCtx.destination);
 
+    updateSoundFilters();
     updateReverbMix();
     loadFlapSample();
   } catch (e) {
-    console.warn('WebAudio not available');
+    audioCtx = null;
+    audioUnlocked = false;
+    console.warn('WebAudio not available', e);
   }
 }
 
 function loadFlapSample() {
-  const b64 = FLAP_SAMPLE_B64;
-  const bin = atob(b64);
-  const bytes = new Uint8Array(bin.length);
-  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-  audioCtx.decodeAudioData(bytes.buffer)
-    .then(decoded => {
-      flapBuffer = decoded;
-      flapSlices = detectFlaps(decoded);
-      console.log(`[audio] loaded ${flapSlices.length} flap slices`);
-    })
-    .catch(e => console.warn('[audio] failed to decode flap sample:', e));
+  try {
+    const b64 = FLAP_SAMPLE_B64;
+    const bin = atob(b64);
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    const onErr = e => console.warn('[audio] failed to decode flap sample:', e);
+    /* decodeAudioData returns a promise in modern browsers; fall back to the
+       older callback signature only for engines that don't (legacy WebKit).
+       Pick exactly one path so the buffer isn't decoded twice. */
+    const p = audioCtx.decodeAudioData(bytes.buffer);
+    if (p && typeof p.then === 'function') {
+      p.then(onFlapDecoded).catch(onErr);
+    }
+  } catch (e) {
+    /* Legacy callback-only decodeAudioData throws (or returns undefined) when
+       called without callbacks — retry with the callback signature. */
+    try {
+      audioCtx.decodeAudioData(
+        (function () { const bin = atob(FLAP_SAMPLE_B64); const b = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) b[i] = bin.charCodeAt(i); return b.buffer; })(),
+        onFlapDecoded,
+        err => console.warn('[audio] failed to decode flap sample:', err)
+      );
+      return;
+    } catch (_) { /* fall through to synthetic clack */ }
+    console.warn('[audio] flap sample unavailable, using synthetic clack:', e);
+  }
+}
+
+function onFlapDecoded(decoded) {
+  flapBuffer = decoded;
+  flapSlices = detectFlaps(decoded);
+  console.log(`[audio] loaded ${flapSlices.length} flap slices`);
 }
 
 /* Detect individual flap sounds by finding amplitude peaks */
@@ -1949,11 +2050,28 @@ function detectFlaps(buffer) {
       lastPeak = i;
     }
   }
+
+  /* Robustness: if peak detection finds nothing (unexpected sample, silence,
+     or a too-aggressive threshold), fall back to evenly chopping the buffer so
+     we still play the real recording instead of the synthetic stand-in. */
+  if (slices.length === 0 && buffer.duration > 0) {
+    const step = Math.min(0.1, buffer.duration);
+    for (let t = 0; t + step <= buffer.duration; t += step) {
+      slices.push({ start: t, duration: step });
+    }
+    if (slices.length === 0) slices.push({ start: 0, duration: buffer.duration });
+  }
   return slices;
 }
 
 function playClack(volume, col, totalCols, row, totalRows) {
   if (!audioCtx || !audioUnlocked || settings.muted || prefersReducedMotion) return;
+  /* Don't burn CPU/battery scheduling sound the user can't hear. */
+  if (typeof document !== 'undefined' && document.hidden) return;
+  /* Voice budget — drop the clack (not the visual flip) once the graph is at
+     capacity. Slices are ~100ms, so the cap throttles dense bursts without
+     audibly thinning a normal cascade. */
+  if (activeVoices >= MAX_VOICES) return;
   const vol = (volume != null ? volume : settings.volume) / 100;
   if (vol <= 0) return;
 
@@ -1972,28 +2090,6 @@ function playClack(volume, col, totalCols, row, totalRows) {
     const rowFrac = (row != null && totalRows > 1) ? row / (totalRows - 1) : 0.5;
     src.playbackRate.value = (0.98 - rowFrac * 0.06) + Math.random() * 0.08;
 
-    /* Tone filter — lowpass: 800Hz (dark) to 12000Hz (bright) */
-    const toneFrac = settings.soundTone / 100;
-    const toneFilter = audioCtx.createBiquadFilter();
-    toneFilter.type = 'lowpass';
-    toneFilter.frequency.value = 800 + toneFrac * 11200;
-    toneFilter.Q.value = 0.7;
-
-    /* Body filter — peaking EQ at 400Hz: -6dB to +12dB */
-    const bodyFrac = settings.soundBody / 100;
-    const bodyFilter = audioCtx.createBiquadFilter();
-    bodyFilter.type = 'peaking';
-    bodyFilter.frequency.value = 400;
-    bodyFilter.Q.value = 1;
-    bodyFilter.gain.value = -6 + bodyFrac * 18;
-
-    /* Snap filter — highshelf at 3kHz: 0 to +8dB, with attack envelope */
-    const snapFrac = settings.soundSnap / 100;
-    const snapFilter = audioCtx.createBiquadFilter();
-    snapFilter.type = 'highshelf';
-    snapFilter.frequency.value = 3000;
-    snapFilter.gain.value = snapFrac * 8;
-
     /* Stereo panner — spread columns across -0.7 to +0.7 */
     const panner = audioCtx.createStereoPanner();
     if (col != null && totalCols > 1) {
@@ -2010,22 +2106,23 @@ function playClack(volume, col, totalCols, row, totalRows) {
     const jitter = 0.85 + Math.random() * 0.3;
 
     const gain = audioCtx.createGain();
-    /* Snap attack envelope: sharper attack at higher snap values */
-    const attackMul = 1.0 + snapFrac * 1.5;
+    /* Snap attack envelope: sharper attack at higher snap values. (Tone/body/
+       snap EQ now lives in the shared master chain — see initAudio.) */
+    const attackMul = 1.0 + (settings.soundSnap / 100) * 1.5;
     gain.gain.setValueAtTime(vol * duckFactor * rowGain * jitter * attackMul, startTime);
     gain.gain.exponentialRampToValueAtTime(
       Math.max(0.001, vol * duckFactor * rowGain * jitter),
       startTime + 0.008
     );
 
-    /* Chain: src → tone → body → snap → panner → gain → masterInput */
-    src.connect(toneFilter);
-    toneFilter.connect(bodyFilter);
-    bodyFilter.connect(snapFilter);
-    snapFilter.connect(panner);
-    panner.connect(gain);
-    gain.connect(masterInput || audioCtx.destination);
+    /* Per-voice chain (3 nodes): src → gain → panner → masterInput.
+       Shared EQ + reverb are applied downstream of masterInput. */
+    src.connect(gain);
+    gain.connect(panner);
+    panner.connect(masterInput || audioCtx.destination);
 
+    activeVoices++;
+    src.onended = () => { activeVoices--; };
     src.start(startTime, slice.start, slice.duration);
   } else {
     playsyntheticClack(vol, col, totalCols);
@@ -2057,6 +2154,8 @@ function playsyntheticClack(vol, col, totalCols) {
   src.connect(panner);
   panner.connect(gain);
   gain.connect(masterInput || audioCtx.destination);
+  activeVoices++;
+  src.onended = () => { activeVoices--; };
   src.start(now);
   src.stop(now + dur + 0.01);
 }
@@ -2083,7 +2182,8 @@ function createBoardDOM() {
   grid.innerHTML = '';
   cellRefs = [];
 
-  const { rows, cols, cellSize } = settings;
+  const { rows, cols } = settings;
+  const cellSize = effectiveCellSize();
   const cellH = Math.round(cellSize * 1.42);
   const fontSize = Math.round(cellSize * 0.62);
   const shapeSize = Math.round(cellSize * 0.58);
@@ -2139,12 +2239,16 @@ function createBoardDOM() {
     }
   }
 
-  /* Initialize dust overlay with random seeds */
-  for (let r = 0; r < rows; r++) {
-    for (let c = 0; c < cols; c++) {
-      const dust = cellRefs[r][c].dust;
-      dust.style.opacity = (0.01 + Math.random() * 0.025).toFixed(3);
-      dust.style.backgroundPosition = `${Math.random()*64|0}px ${Math.random()*64|0}px`;
+  /* Initialize dust overlay with random seeds. Each dust layer paints a tiny
+     SVG noise texture; at low opacity it's invisible on dense boards, so we
+     skip it past ~300 cells to save per-cell paint cost (esp. on mobile). */
+  if (rows * cols <= 300) {
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        const dust = cellRefs[r][c].dust;
+        dust.style.opacity = (0.01 + Math.random() * 0.025).toFixed(3);
+        dust.style.backgroundPosition = `${Math.random()*64|0}px ${Math.random()*64|0}px`;
+      }
     }
   }
 }
@@ -2529,9 +2633,25 @@ function applySceneByIndex(index, immediate) {
 /* ══════════════════════════════════════════
    BOARD SIZING — fills viewport
    ══════════════════════════════════════════ */
+/* The user's chosen cell size is great on a desktop but produces a board of
+   3-4 giant cells (then scaled way down) on a phone. On narrow viewports we
+   cap the *effective* cell size so the board renders as a readable multi-column
+   grid. This never mutates/persists settings.cellSize — it's purely a
+   layout-time adjustment, so the desktop preference is preserved. */
+function effectiveCellSize() {
+  let s = settings.cellSize;
+  const vw = window.innerWidth;
+  if (vw < 600) {
+    s = Math.min(s, Math.max(26, Math.round(vw / 11)));
+  } else if (vw < 900) {
+    s = Math.min(s, 64);
+  }
+  return s;
+}
+
 function autoSizeBoard() {
   /* Calculate how many rows/cols fit the viewport at current cell size */
-  const cellW = settings.cellSize;
+  const cellW = effectiveCellSize();
   const cellH = Math.round(cellW * 1.42);
   const gap = 3;
   const hPad = 48;  // board-inner horizontal padding + board border
@@ -2546,7 +2666,8 @@ function autoSizeBoard() {
 
 function scaleBoard() {
   const frame = document.getElementById('boardFrame');
-  const { rows, cols, cellSize } = settings;
+  const { rows, cols } = settings;
+  const cellSize = effectiveCellSize();
   const cellH = Math.round(cellSize * 1.42);
   const gap = 3;
   const boardW = cols * (cellSize + gap) + 44;
@@ -2554,7 +2675,8 @@ function scaleBoard() {
 
   const maxW = window.innerWidth - 8;
   const maxH = window.innerHeight - 8;
-  const scale = Math.min(maxW / boardW, maxH / boardH);
+  /* Never scale a small board up past its natural size. */
+  const scale = Math.min(maxW / boardW, maxH / boardH, 1);
 
   frame.style.transform = `scale(${scale})`;
 }
@@ -2684,6 +2806,7 @@ function setupConfigUI() {
       if (sound) {
         settings.soundPreset = 'custom';
         document.getElementById('cfgSoundPreset').value = 'custom';
+        updateSoundFilters();
         saveSettings();
       }
       if (room) {
@@ -2718,6 +2841,7 @@ function setupConfigUI() {
     document.getElementById('cfgSoundBodyVal').textContent = preset.soundBody;
     document.getElementById('cfgSoundRoom').value = preset.soundRoom;
     document.getElementById('cfgSoundRoomVal').textContent = preset.soundRoom;
+    updateSoundFilters();
     updateReverbMix();
     saveSettings();
   }
@@ -3269,6 +3393,17 @@ function init() {
   document.getElementById('boardGrid').addEventListener('click', () => {
     initAudio();
     pauseAutoRotateTemporarily();
+  });
+
+  /* Audio resilience: mobile browsers suspend the AudioContext when the tab is
+     backgrounded. Resume on return, and clear the voice counter in case any
+     'ended' events were dropped while suspended (which would otherwise wedge
+     the voice budget and silence all clacks). */
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden && audioCtx && audioCtx.state === 'suspended') {
+      audioCtx.resume().catch(() => {});
+      activeVoices = 0;
+    }
   });
 
 }
