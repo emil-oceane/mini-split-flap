@@ -44,7 +44,6 @@
 <title>Mini Split Flap — Interactive Retro Departure Board Simulator</title>
 <meta name="description" content="Mini Split Flap is a realistic split-flap display simulator with animated flipping letters, mechanical sounds, customizable scenes, live clock, and weather. No install required — runs entirely in your browser.">
 <meta name="keywords" content="mini split flap, split-flap display, departure board, flip board, solari board, retro display, flight board, train station display, mechanical display simulator">
-<meta name="author" content="Emil Tarazi">
 <meta name="robots" content="index, follow">
 <link rel="canonical" href="https://minisplitflap.com/">
 
@@ -356,6 +355,7 @@ body {
   backface-visibility: hidden;
   -webkit-backface-visibility: hidden;
 }
+.board-canvas { display: block; }
 
 /* ══════════════════════════════════════════
    CELL STYLING
@@ -976,6 +976,57 @@ input[type="checkbox"]:checked::after {
   justify-content: flex-end;
 }
 
+/* Quick text bar */
+.quick-text-bar {
+  position: fixed;
+  left: 50%;
+  bottom: 32px;
+  transform: translateX(-50%) translateY(10px);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: min(92vw, 440px);
+  background: var(--drawer-bg);
+  border: 1px solid var(--drawer-border);
+  border-radius: 10px;
+  padding: 10px 14px;
+  box-shadow: 0 8px 30px rgba(0,0,0,0.5);
+  z-index: 90;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+.quick-text-bar.open {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateX(-50%) translateY(0);
+}
+.quick-text-bar input {
+  flex: 1;
+  min-width: 0;
+  background: var(--input-bg);
+  border: 1px solid var(--input-border);
+  border-radius: 6px;
+  color: var(--text-primary);
+  font-family: 'Menlo', 'Consolas', 'SF Mono', monospace;
+  font-size: 13px;
+  padding: 8px 10px;
+  outline: none;
+  text-transform: uppercase;
+}
+.quick-text-bar input:focus { border-color: var(--accent-dim); }
+.quick-text-hint {
+  font-size: 10px;
+  color: var(--text-dim);
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+@media (max-width: 480px) {
+  .quick-text-hint { display: none; }
+}
+.icon-btn.active-mode { color: var(--accent); background: rgba(255,255,255,0.06); }
+
 /* Theme selector */
 .theme-options {
   display: flex;
@@ -1161,6 +1212,11 @@ body.theme-green {
         <span class="board-header-title">MINI SPLIT FLAP</span>
         <span class="board-header-clock" id="headerClock">--:--:--</span>
         <div class="board-header-actions">
+          <button class="icon-btn" id="btnQuickText" title="Quick text (T)" aria-label="Quick text">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="4 7 4 4 20 4 20 7"/><line x1="9" y1="20" x2="15" y2="20"/><line x1="12" y1="4" x2="12" y2="20"/>
+            </svg>
+          </button>
           <button class="icon-btn" id="btnConfig" title="Configuration" aria-label="Open configuration">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
@@ -1211,6 +1267,12 @@ body.theme-green {
   </div>
 </div>
 
+<!-- ═══ QUICK TEXT BAR ═══ -->
+<div class="quick-text-bar" id="quickTextBar">
+  <input type="text" id="quickTextInput" placeholder="Type a message..." maxlength="200" autocomplete="off" spellcheck="false">
+  <span class="quick-text-hint">| new line &middot; {heart} shapes &middot; Esc closes</span>
+</div>
+
 <!-- ═══ CONFIG OVERLAY ═══ -->
 <div class="config-overlay" id="configOverlay"></div>
 
@@ -1244,6 +1306,9 @@ body.theme-green {
         <input type="range" id="cfgCellSize" min="28" max="160" value="56" step="2">
       </div>
       <span class="config-value" id="cfgCellSizeVal">56</span>
+    </div>
+    <div style="margin-top:6px;">
+      <button class="config-btn small" id="btnFitScreen">Fit To Screen</button>
     </div>
   </div>
 
@@ -1469,6 +1534,7 @@ let settings = {
   rows: 6,
   cols: 20,
   cellSize: 85,
+  manualGrid: false,
   flipSpeed: 250,
   stagger: 22,
   flipDirection: 'waterfall',
@@ -1509,6 +1575,7 @@ let audioUnlocked = false;
 /* Persistent audio graph nodes */
 let masterInput = null;
 let masterGain = null;
+let masterComp = null;
 let dryGain = null;
 let wetGain = null;
 let reverbNode = null;
@@ -1979,7 +2046,16 @@ function initAudio() {
     reverbNode.connect(wetGain);
     wetGain.connect(masterGain);
 
-    masterGain.connect(audioCtx.destination);
+    /* Master compressor glues dense cascades together and stops a full-board
+       flip (dozens of simultaneous clacks) from clipping the output. */
+    masterComp = audioCtx.createDynamicsCompressor();
+    masterComp.threshold.value = -18;
+    masterComp.knee.value = 18;
+    masterComp.ratio.value = 4;
+    masterComp.attack.value = 0.002;
+    masterComp.release.value = 0.12;
+    masterGain.connect(masterComp);
+    masterComp.connect(audioCtx.destination);
 
     updateSoundFilters();
     updateReverbMix();
@@ -2161,6 +2237,627 @@ function playsyntheticClack(vol, col, totalCols) {
 }
 
 /* ══════════════════════════════════════════
+   WEBGL RENDERER
+   One canvas, instanced quads, a glyph atlas.
+   Each cell is 2 static half-card instances;
+   animating cells add one flap instance drawn
+   with real 3D rotation, perspective, dynamic
+   lighting and a cast shadow. Falls back to
+   the DOM renderer when WebGL2 is unavailable
+   or the context is lost. Force the fallback
+   with ?dom in the URL.
+   ══════════════════════════════════════════ */
+const FORCE_DOM_RENDERER = new URLSearchParams(window.location.search).has('dom');
+let glActive = false;
+let glCanvas = null;
+let gl = null;
+let glProg = null;
+let glLoc = {};
+let glQuadBuf = null;
+let glStaticBuf = null;
+let glFlapBuf = null;
+let glStaticData = null;
+let glFlapData = null;
+let glStaticDirty = false;
+let glCellPos = null;   /* cell origins (px), incl. tiny per-cell misalignment */
+let glCellRand = null;  /* per-cell wear factor */
+let glCellW = 0, glCellH = 0;
+let glLogicalW = 0, glLogicalH = 0;
+let glDrawQueued = false;
+let glContextLostForever = false;
+
+const GL_GAP = 3;
+const GL_FLOATS = 16; /* floats per instance */
+
+/* Glyph atlas: white glyphs, tinted per-instance in the shader so themes and
+   custom accent colors never force a rebuild. Slots match the cell aspect. */
+const ATLAS_W = 1024, ATLAS_H = 2048;
+const SLOT_W = 96, SLOT_H = 136;
+const SLOT_COLS = Math.floor(ATLAS_W / SLOT_W);
+const SLOT_ROWS = Math.floor(ATLAS_H / SLOT_H);
+let atlasCanvas = null, atlasCtx = null, atlasTex = null;
+let atlasUploadPending = false;
+const atlasMap = new Map();
+let atlasNext = 0;
+
+/* SVG path data mirroring getShapeSVG, drawn into the atlas via Path2D */
+const SHAPE_PATHS = {
+  circle:  'M12 4a8 8 0 1 0 0 16 8 8 0 1 0 0-16z',
+  square:  'M5.5 4h13A1.5 1.5 0 0 1 20 5.5v13a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 18.5v-13A1.5 1.5 0 0 1 5.5 4z',
+  triangle:'M12 3 22 20 2 20z',
+  diamond: 'M12 2 22 12 12 22 2 12z',
+  arrow:   'M12 3l7 8h-4v7h-6v-7H5l7-8z',
+  heart:   'M12 21C11 20 3 14.5 3 9.5a4.5 4.5 0 0 1 9-1 4.5 4.5 0 0 1 9 1c0 5.5-8 10.5-9 11.5z',
+  star:    'M12 2 14.9 8.6 22 9.3 16.8 13.8 18.2 21 12 17.3 5.8 21 7.2 13.8 2 9.3 9.1 8.6z',
+  check:   'M4 12 9 18 20 5',
+  x:       'M5 5 19 19M19 5 5 19'
+};
+const STROKE_ONLY_SHAPES = { check: true, x: true };
+
+const GL_VS = `#version 300 es
+layout(location=0) in vec2 a_pos;
+layout(location=1) in vec4 i_a;   /* x, y, kind, angle(rad) */
+layout(location=2) in vec4 i_uv;  /* glyphA u,v  glyphB u,v */
+layout(location=3) in vec4 i_ta;  /* tintA rgb, rand */
+layout(location=4) in vec4 i_tb;  /* tintB rgb, pad */
+uniform vec2 u_res;
+uniform vec2 u_cell;
+uniform float u_mode;   /* 0 = cards, 1 = flap shadow */
+uniform float u_persp;
+out vec2 v_local;
+out float v_kind;
+out float v_angle;
+flat out vec3 v_tintA;
+flat out vec3 v_tintB;
+flat out vec2 v_uvA;
+flat out vec2 v_uvB;
+flat out float v_rand;
+void main() {
+  float kind = i_a.z;
+  float angle = i_a.w;
+  float halfH = u_cell.y * 0.5;
+  vec2 pos;
+  if (u_mode > 0.5) {
+    /* shadow cast by the falling flap onto the lower card */
+    float sh = sin(clamp(angle, 0.0, 3.14159265));
+    pos = i_a.xy + vec2(a_pos.x * u_cell.x, halfH + a_pos.y * u_cell.y * 0.42 + sh * 2.0);
+  } else if (kind < 1.5) {
+    /* static upper (0) / lower (1) half-card */
+    float top = kind < 0.5 ? 0.0 : halfH;
+    pos = i_a.xy + vec2(a_pos.x * u_cell.x, top + a_pos.y * halfH);
+  } else {
+    /* flap rotating about the hinge, with perspective */
+    float ly = (1.0 - a_pos.y) * halfH;  /* height above hinge */
+    float zz = ly * sin(angle);          /* toward the viewer */
+    float persp = u_persp / max(u_persp - zz, 1.0);
+    float cx = i_a.x + u_cell.x * 0.5;
+    pos.x = cx + (a_pos.x - 0.5) * u_cell.x * persp;
+    pos.y = i_a.y + halfH - ly * cos(angle) * persp;
+  }
+  vec2 ndc = pos / u_res * 2.0 - 1.0;
+  gl_Position = vec4(ndc.x, -ndc.y, 0.0, 1.0);
+  v_local = a_pos;
+  v_kind = kind;
+  v_angle = angle;
+  v_tintA = i_ta.rgb;
+  v_tintB = i_tb.rgb;
+  v_uvA = i_uv.xy;
+  v_uvB = i_uv.zw;
+  v_rand = i_ta.w;
+}`;
+
+const GL_FS = `#version 300 es
+precision highp float;
+in vec2 v_local;
+in float v_kind;
+in float v_angle;
+flat in vec3 v_tintA;
+flat in vec3 v_tintB;
+flat in vec2 v_uvA;
+flat in vec2 v_uvB;
+flat in float v_rand;
+uniform sampler2D u_atlas;
+uniform vec2 u_glyph;   /* atlas slot du, dv */
+uniform vec2 u_cell;    /* logical px */
+uniform float u_mode;
+uniform float u_radius;
+uniform vec3 u_upperA;
+uniform vec3 u_upperB;
+uniform vec3 u_lowerA;
+uniform vec3 u_lowerB;
+out vec4 o;
+
+/* antialiased rounded-rect coverage over the full cell */
+float cardAlpha(vec2 p) {
+  vec2 b = u_cell * 0.5 - vec2(u_radius);
+  vec2 q = abs(p - u_cell * 0.5) - b;
+  float d = length(max(q, vec2(0.0))) + min(max(q.x, q.y), 0.0) - u_radius;
+  return clamp(0.5 - d / max(fwidth(d), 0.0001), 0.0, 1.0);
+}
+
+void main() {
+  float halfH = u_cell.y * 0.5;
+  bool isFlap = v_kind > 1.5;
+  bool back = isFlap && v_angle > 1.5707963;
+  /* which visual half of the cell this fragment lands in */
+  bool lowerHalf = (!isFlap && v_kind > 0.5) || back;
+  float vHalf = back ? 1.0 - v_local.y : v_local.y;
+  vec2 cellP = vec2(v_local.x * u_cell.x, (lowerHalf ? halfH : 0.0) + vHalf * halfH);
+  float alpha = cardAlpha(cellP);
+
+  if (u_mode > 0.5) {
+    float sh = sin(clamp(v_angle, 0.0, 3.14159265));
+    float fall = pow(1.0 - v_local.y, 1.6);
+    float a = alpha * sh * 0.5 * fall;
+    o = vec4(0.0, 0.0, 0.0, a);
+    return;
+  }
+
+  /* hinge gap between the halves */
+  float hingePx = (lowerHalf ? vHalf : (1.0 - vHalf)) * halfH;
+  alpha *= clamp(hingePx / 0.9, 0.0, 1.0);
+
+  /* card gradient */
+  vec3 card = lowerHalf ? mix(u_lowerA, u_lowerB, vHalf) : mix(u_upperA, u_upperB, vHalf);
+  /* subtle gloss near the top edge of upper faces */
+  if (!lowerHalf) card += vec3(0.035) * (1.0 - smoothstep(0.0, 0.9, vHalf));
+
+  /* glyph sample: statics show their half of glyph A; the flap front shows
+     the top half of the outgoing glyph, the flap back the bottom half of the
+     incoming glyph (painted so it reads upright once landed) */
+  vec2 g;
+  vec3 tint;
+  if (!isFlap) {
+    g = v_uvA + vec2(v_local.x, (v_kind > 0.5 ? 0.5 : 0.0) + v_local.y * 0.5) * u_glyph;
+    tint = v_tintA;
+  } else if (!back) {
+    g = v_uvA + vec2(v_local.x, v_local.y * 0.5) * u_glyph;
+    tint = v_tintA;
+  } else {
+    g = v_uvB + vec2(v_local.x, 1.0 - v_local.y * 0.5) * u_glyph;
+    tint = v_tintB;
+  }
+  float ga = texture(u_atlas, g).a;
+  vec3 col = mix(card, tint, ga);
+
+  /* lighting: the front face catches the light as it tips, the back face
+     starts in shadow and brightens as it lands */
+  float lum = 1.0;
+  if (isFlap) {
+    float s = sin(v_angle);
+    if (!back) lum = 1.0 + 0.38 * s;
+    else lum = 0.52 + 0.48 * clamp((v_angle - 1.5707963) / 1.5707963, 0.0, 1.0) + 0.22 * s;
+  }
+  /* per-cell wear variation */
+  lum *= 0.955 + v_rand * 0.09;
+  col *= lum;
+
+  o = vec4(col * alpha, alpha);
+}`;
+
+function glCompile(type, src) {
+  const sh = gl.createShader(type);
+  gl.shaderSource(sh, src);
+  gl.compileShader(sh);
+  if (!gl.getShaderParameter(sh, gl.COMPILE_STATUS)) {
+    const log = gl.getShaderInfoLog(sh);
+    gl.deleteShader(sh);
+    throw new Error('shader compile failed: ' + log);
+  }
+  return sh;
+}
+
+function tryInitGL() {
+  if (FORCE_DOM_RENDERER || glContextLostForever) return false;
+  if (gl && !gl.isContextLost() && glProg) return true;
+  try {
+    if (!glCanvas) {
+      glCanvas = document.createElement('canvas');
+      glCanvas.className = 'board-canvas';
+      glCanvas.addEventListener('webglcontextlost', (e) => {
+        e.preventDefault();
+        /* Fall back to the DOM renderer for the rest of the session */
+        glContextLostForever = true;
+        glActive = false;
+        gl = null;
+        glProg = null;
+        atlasTex = null;
+        atlasMap.clear();
+        atlasNext = 0;
+        rebuildBoard();
+      });
+    }
+    gl = glCanvas.getContext('webgl2', { alpha: true, antialias: true, premultipliedAlpha: true });
+    if (!gl) return false;
+
+    const vs = glCompile(gl.VERTEX_SHADER, GL_VS);
+    const fs = glCompile(gl.FRAGMENT_SHADER, GL_FS);
+    glProg = gl.createProgram();
+    gl.attachShader(glProg, vs);
+    gl.attachShader(glProg, fs);
+    gl.linkProgram(glProg);
+    if (!gl.getProgramParameter(glProg, gl.LINK_STATUS)) {
+      console.warn('[gl] link failed:', gl.getProgramInfoLog(glProg));
+      gl = null;
+      glProg = null;
+      return false;
+    }
+    gl.useProgram(glProg);
+    ['u_res','u_cell','u_mode','u_persp','u_atlas','u_glyph','u_radius',
+     'u_upperA','u_upperB','u_lowerA','u_lowerB'].forEach(n => {
+      glLoc[n] = gl.getUniformLocation(glProg, n);
+    });
+
+    /* Unit quad — location 0 binding is captured once here */
+    glQuadBuf = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, glQuadBuf);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([0,0, 1,0, 0,1, 0,1, 1,0, 1,1]), gl.STATIC_DRAW);
+    gl.enableVertexAttribArray(0);
+    gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+
+    glStaticBuf = gl.createBuffer();
+    glFlapBuf = gl.createBuffer();
+
+    atlasCanvas = document.createElement('canvas');
+    atlasCanvas.width = ATLAS_W;
+    atlasCanvas.height = ATLAS_H;
+    atlasCtx = atlasCanvas.getContext('2d');
+    atlasMap.clear();
+    atlasNext = 0;
+    atlasTex = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, atlasTex);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    atlasUploadPending = true;
+
+    gl.enable(gl.BLEND);
+    gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+    return true;
+  } catch (e) {
+    console.warn('[gl] init failed, using DOM renderer:', e);
+    gl = null;
+    glProg = null;
+    return false;
+  }
+}
+
+/* ── Glyph atlas ── */
+function atlasSlot(key, draw) {
+  let slot = atlasMap.get(key);
+  if (slot) return slot;
+  if (atlasNext >= SLOT_COLS * SLOT_ROWS) {
+    /* atlas full (150 glyphs) — render as blank rather than crash */
+    return atlasMap.get('c ') || { u: 0, v: 0 };
+  }
+  const idx = atlasNext++;
+  const sx = (idx % SLOT_COLS) * SLOT_W;
+  const sy = Math.floor(idx / SLOT_COLS) * SLOT_H;
+  atlasCtx.save();
+  atlasCtx.beginPath();
+  atlasCtx.rect(sx, sy, SLOT_W, SLOT_H);
+  atlasCtx.clip();
+  atlasCtx.clearRect(sx, sy, SLOT_W, SLOT_H);
+  draw(atlasCtx, sx, sy);
+  atlasCtx.restore();
+  slot = { u: sx / ATLAS_W, v: sy / ATLAS_H };
+  atlasMap.set(key, slot);
+  atlasUploadPending = true;
+  return slot;
+}
+
+function drawShapeGlyph(ctx, name, style, x, y) {
+  const path = SHAPE_PATHS[name];
+  if (!path) return;
+  const s = SLOT_W * 0.58;
+  ctx.save();
+  ctx.translate(x + (SLOT_W - s) / 2, y + (SLOT_H - s) / 2);
+  ctx.scale(s / 24, s / 24);
+  ctx.fillStyle = '#fff';
+  ctx.strokeStyle = '#fff';
+  ctx.lineJoin = 'round';
+  const p = new Path2D(path);
+  if (STROKE_ONLY_SHAPES[name]) {
+    ctx.lineWidth = 3;
+    ctx.lineCap = 'round';
+    ctx.stroke(p);
+  } else if (style === 'filled') {
+    ctx.fill(p);
+    ctx.lineWidth = 1;
+    ctx.stroke(p);
+  } else {
+    ctx.lineWidth = 2.5;
+    ctx.stroke(p);
+  }
+  ctx.restore();
+}
+
+function glyphForToken(token) {
+  if (!token) token = blankToken();
+  if (token.type === 'shape') {
+    const style = token.style || 'filled';
+    const slot = atlasSlot('s' + token.value + ':' + style,
+      (ctx, x, y) => drawShapeGlyph(ctx, token.value, style, x, y));
+    const tint = token.accent ? parseColor01(token.accent) : glThemeAccent;
+    return { slot, tint };
+  }
+  const ch = token.value || ' ';
+  const slot = atlasSlot('c' + ch, (ctx, x, y) => {
+    ctx.fillStyle = '#fff';
+    ctx.font = `700 ${Math.round(SLOT_W * 0.62)}px Menlo, Consolas, 'SF Mono', 'Courier New', monospace`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(ch, x + SLOT_W / 2, y + SLOT_H / 2 + SLOT_H * 0.02);
+  });
+  return { slot, tint: glThemeText };
+}
+
+/* ── Theme colors ── */
+let glThemeText = [0.91, 0.84, 0.64];
+let glThemeAccent = [0.94, 0.63, 0.19];
+let glCardUpperA = [0.12, 0.12, 0.12];
+let glCardUpperB = [0.10, 0.10, 0.10];
+let glCardLowerA = [0.07, 0.07, 0.07];
+let glCardLowerB = [0.08, 0.08, 0.08];
+
+let _colorCtx = null;
+function parseColor01(str) {
+  if (!_colorCtx) {
+    const c = document.createElement('canvas');
+    c.width = c.height = 1;
+    _colorCtx = c.getContext('2d', { willReadFrequently: true });
+  }
+  _colorCtx.fillStyle = '#000';
+  _colorCtx.fillStyle = str;
+  _colorCtx.clearRect(0, 0, 1, 1);
+  _colorCtx.fillRect(0, 0, 1, 1);
+  const d = _colorCtx.getImageData(0, 0, 1, 1).data;
+  return [d[0] / 255, d[1] / 255, d[2] / 255];
+}
+
+function glReadTheme() {
+  const cs = getComputedStyle(document.body);
+  const get = (name, fb) => (cs.getPropertyValue(name) || '').trim() || fb;
+  glThemeText = parseColor01(get('--cell-text', '#e8d5a3'));
+  glThemeAccent = parseColor01(get('--accent', '#f0a030'));
+  const bg = parseColor01(get('--cell-bg', '#1a1a1a'));
+  const bgU = parseColor01(get('--cell-bg-upper', '#1c1c1c'));
+  const bgL = parseColor01(get('--cell-bg-lower', '#151515'));
+  /* gradient endpoints derived from the theme (the CSS renderer hardcodes
+     charcoal tints in its gradients — this follows the theme properly) */
+  glCardUpperA = bgU.map(v => Math.min(1, v * 1.25 + 0.012));
+  glCardUpperB = bg;
+  glCardLowerA = bgL.map(v => v * 0.82);
+  glCardLowerB = bgL;
+}
+
+function glOnThemeChange() {
+  if (!glActive) return;
+  glReadTheme();
+  for (let r = 0; r < settings.rows; r++) {
+    for (let c = 0; c < settings.cols; c++) {
+      glSetCell(r, c, (currentGrid[r] && currentGrid[r][c]) || blankToken());
+    }
+  }
+  glRequestDraw();
+}
+
+/* ── Board build / resize ── */
+function createBoardGL() {
+  const grid = document.getElementById('boardGrid');
+  grid.innerHTML = '';
+  grid.style.gridTemplateColumns = '';
+  grid.style.gridTemplateRows = '';
+  cellRefs = [];
+  glReadTheme();
+
+  const { rows, cols } = settings;
+  const cellW = effectiveCellSize();
+  const cellH = Math.round(cellW * 1.42);
+  glCellW = cellW;
+  glCellH = cellH;
+  glLogicalW = cols * (cellW + GL_GAP) - GL_GAP;
+  glLogicalH = rows * (cellH + GL_GAP) - GL_GAP;
+
+  document.documentElement.style.setProperty('--cell-w', cellW + 'px');
+  document.documentElement.style.setProperty('--cell-h', cellH + 'px');
+
+  glCanvas.style.width = glLogicalW + 'px';
+  glCanvas.style.height = glLogicalH + 'px';
+  grid.appendChild(glCanvas);
+
+  const n = rows * cols;
+  glStaticData = new Float32Array(n * 2 * GL_FLOATS);
+  glFlapData = new Float32Array(n * GL_FLOATS);
+  glCellPos = new Float32Array(n * 2);
+  glCellRand = new Float32Array(n);
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const i = r * cols + c;
+      glCellRand[i] = Math.random();
+      /* tiny per-cell misalignment, like real card modules */
+      glCellPos[i * 2] = c * (cellW + GL_GAP) + (Math.random() - 0.5) * 1.1;
+      glCellPos[i * 2 + 1] = r * (cellH + GL_GAP) + (Math.random() - 0.5) * 0.9;
+    }
+  }
+  glStaticDirty = true;
+
+  /* Pre-warm the atlas so no texture uploads land mid-animation */
+  for (const ch of CHAR_SET) glyphForToken(charToken(ch));
+
+  glResize(true);
+}
+
+function glResize(force) {
+  if (!gl || !glCanvas) return;
+  const frame = document.getElementById('boardFrame');
+  let frameScale = 1;
+  const m = /scale\(([\d.]+)\)/.exec(frame.style.transform || '');
+  if (m) frameScale = parseFloat(m[1]) || 1;
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  /* render at on-screen resolution: logical px × dpr × frame downscale */
+  const res = dpr * Math.min(frameScale, 1);
+  let w = Math.max(1, Math.round(glLogicalW * res));
+  let h = Math.max(1, Math.round(glLogicalH * res));
+  const cap = 4096;
+  const down = Math.min(1, cap / w, cap / h);
+  w = Math.round(w * down);
+  h = Math.round(h * down);
+  if (!force) {
+    /* tolerate small scale changes to avoid canvas reallocation storms */
+    const dw = Math.abs(glCanvas.width - w) / Math.max(w, 1);
+    const dh = Math.abs(glCanvas.height - h) / Math.max(h, 1);
+    if (dw < 0.2 && dh < 0.2) return;
+  }
+  glCanvas.width = w;
+  glCanvas.height = h;
+  gl.viewport(0, 0, w, h);
+  glRequestDraw();
+}
+
+/* ── Instance data ── */
+function glWriteHalf(r, c, kind, glyph) {
+  const i = r * settings.cols + c;
+  const base = (i * 2 + kind) * GL_FLOATS;
+  const d = glStaticData;
+  d[base] = glCellPos[i * 2];
+  d[base + 1] = glCellPos[i * 2 + 1];
+  d[base + 2] = kind;
+  d[base + 3] = 0;
+  d[base + 4] = glyph.slot.u;
+  d[base + 5] = glyph.slot.v;
+  d[base + 6] = 0;
+  d[base + 7] = 0;
+  d[base + 8] = glyph.tint[0];
+  d[base + 9] = glyph.tint[1];
+  d[base + 10] = glyph.tint[2];
+  d[base + 11] = glCellRand[i];
+  d[base + 12] = 0;
+  d[base + 13] = 0;
+  d[base + 14] = 0;
+  d[base + 15] = 0;
+  glStaticDirty = true;
+}
+
+function glSetCell(r, c, token) {
+  const g = glyphForToken(token);
+  glWriteHalf(r, c, 0, g);
+  glWriteHalf(r, c, 1, g);
+}
+
+function glSetUpper(r, c, token) {
+  glWriteHalf(r, c, 0, glyphForToken(token));
+}
+
+function glRequestDraw() {
+  if (!glActive || glDrawQueued) return;
+  glDrawQueued = true;
+  requestAnimationFrame(() => {
+    glDrawQueued = false;
+    glDraw();
+  });
+}
+
+function glBindInstanceAttribs() {
+  const stride = GL_FLOATS * 4;
+  for (let loc = 1; loc <= 4; loc++) {
+    gl.enableVertexAttribArray(loc);
+    gl.vertexAttribPointer(loc, 4, gl.FLOAT, false, stride, (loc - 1) * 16);
+    gl.vertexAttribDivisor(loc, 1);
+  }
+}
+
+function glDraw() {
+  if (!glActive || !gl || gl.isContextLost() || !glStaticData) return;
+
+  if (atlasUploadPending) {
+    gl.bindTexture(gl.TEXTURE_2D, atlasTex);
+    gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, atlasCanvas);
+    gl.generateMipmap(gl.TEXTURE_2D);
+    atlasUploadPending = false;
+  }
+
+  gl.useProgram(glProg);
+  gl.clearColor(0, 0, 0, 0);
+  gl.clear(gl.COLOR_BUFFER_BIT);
+
+  gl.uniform2f(glLoc.u_res, glLogicalW, glLogicalH);
+  gl.uniform2f(glLoc.u_cell, glCellW, glCellH);
+  gl.uniform1f(glLoc.u_persp, glCellH * 4.4);
+  gl.uniform1f(glLoc.u_radius, Math.max(2, glCellW * 0.07));
+  gl.uniform2f(glLoc.u_glyph, SLOT_W / ATLAS_W, SLOT_H / ATLAS_H);
+  gl.uniform3fv(glLoc.u_upperA, glCardUpperA);
+  gl.uniform3fv(glLoc.u_upperB, glCardUpperB);
+  gl.uniform3fv(glLoc.u_lowerA, glCardLowerA);
+  gl.uniform3fv(glLoc.u_lowerB, glCardLowerB);
+  gl.activeTexture(gl.TEXTURE0);
+  gl.bindTexture(gl.TEXTURE_2D, atlasTex);
+  gl.uniform1i(glLoc.u_atlas, 0);
+
+  /* static half-cards */
+  gl.bindBuffer(gl.ARRAY_BUFFER, glStaticBuf);
+  if (glStaticDirty) {
+    gl.bufferData(gl.ARRAY_BUFFER, glStaticData, gl.DYNAMIC_DRAW);
+    glStaticDirty = false;
+  }
+  glBindInstanceAttribs();
+  gl.uniform1f(glLoc.u_mode, 0);
+  gl.drawArraysInstanced(gl.TRIANGLES, 0, 6, settings.rows * settings.cols * 2);
+
+  /* animating flaps: shadows first, then the cards */
+  let nf = 0;
+  for (const [, st] of activeFlips) {
+    if (!st.gFront || !st.gBack) continue;
+    const i = st.row * settings.cols + st.col;
+    const b = nf * GL_FLOATS;
+    const d = glFlapData;
+    d[b] = glCellPos[i * 2];
+    d[b + 1] = glCellPos[i * 2 + 1];
+    d[b + 2] = 2;
+    d[b + 3] = (st.angle || 0) * Math.PI / 180;
+    d[b + 4] = st.gFront.slot.u;
+    d[b + 5] = st.gFront.slot.v;
+    d[b + 6] = st.gBack.slot.u;
+    d[b + 7] = st.gBack.slot.v;
+    d[b + 8] = st.gFront.tint[0];
+    d[b + 9] = st.gFront.tint[1];
+    d[b + 10] = st.gFront.tint[2];
+    d[b + 11] = glCellRand[i];
+    d[b + 12] = st.gBack.tint[0];
+    d[b + 13] = st.gBack.tint[1];
+    d[b + 14] = st.gBack.tint[2];
+    d[b + 15] = 0;
+    nf++;
+  }
+  if (nf > 0) {
+    gl.bindBuffer(gl.ARRAY_BUFFER, glFlapBuf);
+    gl.bufferData(gl.ARRAY_BUFFER, glFlapData.subarray(0, nf * GL_FLOATS), gl.DYNAMIC_DRAW);
+    glBindInstanceAttribs();
+    gl.uniform1f(glLoc.u_mode, 1);
+    gl.drawArraysInstanced(gl.TRIANGLES, 0, 6, nf);
+    gl.uniform1f(glLoc.u_mode, 0);
+    gl.drawArraysInstanced(gl.TRIANGLES, 0, 6, nf);
+  }
+}
+
+/* Renderer dispatcher — WebGL when available, DOM otherwise */
+function createBoard() {
+  glActive = tryInitGL();
+  if (glActive) {
+    try {
+      createBoardGL();
+      return;
+    } catch (e) {
+      console.warn('[gl] board build failed, falling back to DOM:', e);
+      glActive = false;
+    }
+  }
+  createBoardDOM();
+}
+
+/* ══════════════════════════════════════════
    RENDERER — Cell DOM creation & content
    ══════════════════════════════════════════ */
 function renderTokenHTML(token) {
@@ -2181,6 +2878,7 @@ function createBoardDOM() {
   const grid = document.getElementById('boardGrid');
   grid.innerHTML = '';
   cellRefs = [];
+  glActive = false;
 
   const { rows, cols } = settings;
   const cellSize = effectiveCellSize();
@@ -2264,6 +2962,11 @@ function setCellContent(contentEl, token) {
 }
 
 function setStaticCell(row, col, token) {
+  if (glActive) {
+    glSetCell(row, col, token);
+    glRequestDraw();
+    return;
+  }
   const ref = cellRefs[row][col];
   setCellContent(ref.upper, token);
   setCellContent(ref.lower, token);
@@ -2274,20 +2977,34 @@ function setStaticCell(row, col, token) {
 /* ══════════════════════════════════════════
    ANIMATION ENGINE
    ══════════════════════════════════════════ */
-function easeInOutQuad(t) {
-  return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+/* Flap motion modelled on the real mechanism: the drum carries the card up to
+   the release pin, the card free-falls under gravity, then slams into the
+   stop and settles with a short damped bounce. Returns degrees 0..180. */
+const FLAP_RELEASE_T = 0.38;   /* fraction of the flip under drum control */
+const FLAP_RELEASE_ANGLE = 62; /* angle at which the card clears the pin */
+const FLAP_IMPACT_T = 0.80;    /* when the card first hits the stop */
+
+function flapAngle(t) {
+  if (t <= 0) return 0;
+  if (t >= 1) return 180;
+  if (t <= FLAP_RELEASE_T) {
+    const u = t / FLAP_RELEASE_T;
+    return FLAP_RELEASE_ANGLE * u * (0.5 + 0.5 * u);
+  }
+  if (t <= FLAP_IMPACT_T) {
+    const u = (t - FLAP_RELEASE_T) / (FLAP_IMPACT_T - FLAP_RELEASE_T);
+    return FLAP_RELEASE_ANGLE + (180 - FLAP_RELEASE_ANGLE) * u * u;
+  }
+  const u = (t - FLAP_IMPACT_T) / (1 - FLAP_IMPACT_T);
+  return 180 - Math.abs(Math.sin(u * Math.PI * 2.2)) * 9 * Math.exp(-3.4 * u);
 }
 
-/* Slight bounce at the end for mechanical settle feel */
-function flapEase(t) {
-  if (t < 0.7) {
-    /* Accelerate then decelerate */
-    const t2 = t / 0.7;
-    return t2 < 0.5 ? 2 * t2 * t2 * 0.7 : (1 - Math.pow(-2 * t2 + 2, 2) / 2) * 0.7;
-  }
-  /* Slight overshoot and settle */
-  const t3 = (t - 0.7) / 0.3;
-  return 0.7 + 0.3 * (1 + Math.sin(t3 * Math.PI * 1.2 - Math.PI / 2) * 0.04 * (1 - t3)) * t3;
+/* Intermediate drum flips roll continuously — no per-card settle bounce. */
+const ROLL_IMPACT_T = 0.9;
+function flapAngleRoll(t) {
+  if (t >= 1) return 180;
+  if (t <= 0) return 0;
+  return 180 * t * t * (3 - 2 * t);
 }
 
 function startAnimationLoop() {
@@ -2299,12 +3016,14 @@ function startAnimationLoop() {
 function animationTick(timestamp) {
   if (activeFlips.size === 0) {
     animLoopRunning = false;
+    if (glActive) glDraw(); /* final frame clears any remaining flap quads */
     return;
   }
 
   for (const [key, state] of activeFlips) {
     updateFlip(key, state, timestamp);
   }
+  if (glActive) glDraw();
 
   requestAnimationFrame(animationTick);
 }
@@ -2315,45 +3034,56 @@ function updateFlip(key, state, timestamp) {
   }
   const elapsed = timestamp - state.startTime;
   const progress = Math.min(elapsed / state.duration, 1);
-  const eased = flapEase(progress);
-  const angle = eased * -180;
+  const isFinal = state.queue.length === 0;
+  const angle = isFinal ? flapAngle(progress) : flapAngleRoll(progress);
+  state.angle = angle;
 
   const ref = state.ref;
-  ref.flap.style.transform = `rotateX(${angle}deg)`;
+  if (!glActive && ref) {
+    ref.flap.style.transform = `rotateX(${(-angle).toFixed(2)}deg)`;
+    /* Dynamic shadow under flap — tracks the flap's actual angle */
+    const sh = Math.sin(angle * Math.PI / 180);
+    ref.shadow.style.opacity = (sh * 0.6).toFixed(3);
+    ref.shadow.style.transform = `translateY(${(sh * 4).toFixed(1)}px)`;
+  }
 
-  /* Dynamic shadow under flap — grows as flap lifts, shrinks as it settles */
-  const shadowOpacity = Math.sin(progress * Math.PI) * 0.6;
-  ref.shadow.style.opacity = shadowOpacity.toFixed(3);
-  /* Shift shadow down slightly based on flap angle for depth */
-  const shadowShift = Math.sin(progress * Math.PI) * 4;
-  ref.shadow.style.transform = `translateY(${shadowShift.toFixed(1)}px)`;
-
-  /* At midpoint: update static upper to new char, play sound */
-  if (progress >= 0.5 && !state.midpointDone) {
+  /* Past vertical: the next character's top half is revealed behind the flap */
+  if (angle >= 90 && !state.midpointDone) {
     state.midpointDone = true;
-    setCellContent(ref.upper, state.nextToken);
+    if (glActive) glSetUpper(state.row, state.col, state.nextToken);
+    else if (ref) setCellContent(ref.upper, state.nextToken);
+  }
+
+  /* The clack is the card hitting the stop — play at impact, not midpoint */
+  const impactT = isFinal ? FLAP_IMPACT_T : ROLL_IMPACT_T;
+  if (progress >= impactT && !state.clackDone) {
+    state.clackDone = true;
     playClack(null, state.col, settings.cols, state.row, settings.rows);
   }
 
   /* Complete this flip */
   if (progress >= 1) {
-    setCellContent(ref.lower, state.nextToken);
-    ref.flap.style.display = 'none';
-    ref.flap.style.transform = '';
-    ref.shadow.style.opacity = '0';
-    ref.shadow.style.transform = '';
+    if (glActive) {
+      glSetCell(state.row, state.col, state.nextToken);
+    } else if (ref) {
+      setCellContent(ref.lower, state.nextToken);
+      ref.flap.style.display = 'none';
+      ref.flap.style.transform = '';
+      ref.shadow.style.opacity = '0';
+      ref.shadow.style.transform = '';
 
-    /* Tiny settle imperfection — slight misalignment */
-    const settle = (Math.random() - 0.5) * 0.5;
-    const vsettle = (Math.random() - 0.5) * 0.3;
-    ref.inner.style.transform = `rotate(${settle.toFixed(2)}deg) translateY(${vsettle.toFixed(2)}px)`;
+      /* Tiny settle imperfection — slight misalignment */
+      const settle = (Math.random() - 0.5) * 0.5;
+      const vsettle = (Math.random() - 0.5) * 0.3;
+      ref.inner.style.transform = `rotate(${settle.toFixed(2)}deg) translateY(${vsettle.toFixed(2)}px)`;
+    }
 
     /* More flips in queue? Intermediate flips are faster than the final settle. */
     if (state.queue.length > 0) {
       const next = state.queue.shift();
       const isLast = state.queue.length === 0;
-      const nextDur = isLast ? state.duration : (settings.realisticFlips ? state.duration : state.duration * 0.35);
-      beginSingleFlip(key, state.ref, state.row, state.col, state.nextToken, next, state.queue, nextDur);
+      const nextDur = isLast ? state.duration : (state.realistic ? state.duration : state.duration * 0.35);
+      beginSingleFlip(key, state.ref, state.row, state.col, state.nextToken, next, state.queue, nextDur, state.realistic);
     } else {
       /* Final — update currentGrid */
       currentGrid[state.row][state.col] = state.nextToken;
@@ -2368,13 +3098,19 @@ function updateFlip(key, state, timestamp) {
   }
 }
 
-function beginSingleFlip(key, ref, row, col, fromToken, toToken, queue, duration) {
-  /* Setup flap faces */
-  setCellContent(ref.flapFront, fromToken);
-  setCellContent(ref.flapBack, toToken);
-
-  ref.flap.style.display = '';
-  ref.flap.style.transform = 'rotateX(0deg)';
+function beginSingleFlip(key, ref, row, col, fromToken, toToken, queue, duration, realistic) {
+  if (realistic == null) realistic = settings.realisticFlips;
+  let gFront = null, gBack = null;
+  if (glActive) {
+    /* Flap faces resolved to atlas glyphs once per sub-flip */
+    gFront = glyphForToken(fromToken);
+    gBack = glyphForToken(toToken);
+  } else if (ref) {
+    setCellContent(ref.flapFront, fromToken);
+    setCellContent(ref.flapBack, toToken);
+    ref.flap.style.display = '';
+    ref.flap.style.transform = 'rotateX(0deg)';
+  }
 
   activeFlips.set(key, {
     ref,
@@ -2384,8 +3120,13 @@ function beginSingleFlip(key, ref, row, col, fromToken, toToken, queue, duration
     nextToken: toToken,
     queue,
     duration,
+    realistic,
     startTime: null,
     midpointDone: false,
+    clackDone: false,
+    angle: 0,
+    gFront,
+    gBack,
   });
 }
 
@@ -2393,9 +3134,9 @@ function beginSingleFlip(key, ref, row, col, fromToken, toToken, queue, duration
    In a real split-flap display, the drum rotates forward through the
    character set. Each intermediate character is briefly visible.
    We simulate this by stepping through the charset in order. */
-function generateFlipQueue(from, to, extraFlips) {
+function generateFlipQueue(from, to, extraFlips, realisticOverride) {
   const queue = [];
-  const realistic = settings.realisticFlips;
+  const realistic = realisticOverride != null ? realisticOverride : settings.realisticFlips;
 
   if (from.type === 'char' && to.type === 'char') {
     const fromIdx = CHAR_SET.indexOf(from.value);
@@ -2462,11 +3203,25 @@ function applyGrid(newGrid, immediate, opts) {
   /* Store the target grid so live scenes can compare against it */
   targetGrid = newGrid;
 
-  const changes = diffTokens(currentGrid, newGrid, rows, cols);
+  /* Diff against where each cell is HEADED, not where it is mid-flip —
+     otherwise a cell already flying toward a now-stale character is missed
+     by the diff and lands on the wrong letter. */
+  const changes = [];
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const newT = (newGrid[r] && newGrid[r][c]) || blankToken();
+      const fl = activeFlips.get(`${r}-${c}`);
+      const headed = fl
+        ? (fl.queue.length > 0 ? fl.queue[fl.queue.length - 1] : fl.nextToken)
+        : ((currentGrid[r] && currentGrid[r][c]) || blankToken());
+      if (!tokensEqual(headed, newT)) changes.push({ row: r, col: c, from: headed, to: newT });
+    }
+  }
 
   if (immediate || prefersReducedMotion) {
-    /* Instant update — no animation */
+    /* Instant update — no animation, cancel anything in flight */
     for (const ch of changes) {
+      activeFlips.delete(`${ch.row}-${ch.col}`);
       setStaticCell(ch.row, ch.col, ch.to);
       currentGrid[ch.row][ch.col] = ch.to;
     }
@@ -2530,12 +3285,13 @@ function applyGrid(newGrid, immediate, opts) {
     }
     const delay = t * useStagger + (Math.random() * useJitter);
 
-    const queue = generateFlipQueue(ch.from, ch.to, useExtraFlips);
+    const useRealistic = (opts && opts.realistic != null) ? opts.realistic : settings.realisticFlips;
+    const queue = generateFlipQueue(ch.from, ch.to, useExtraFlips, useRealistic);
     const firstTarget = queue.shift();
-    const ref = cellRefs[ch.row][ch.col];
+    const ref = glActive ? null : cellRefs[ch.row][ch.col];
     /* In realistic mode, each flip = drumSpeed / charset length.
        In skip mode, use flipSpeed with slight random variation. */
-    const dur = settings.realisticFlips
+    const dur = useRealistic
       ? (settings.drumSpeed * 1000) / CHAR_SET.length
       : flipSpeed + (Math.random() - 0.5) * flipSpeed * 0.2;
 
@@ -2544,8 +3300,8 @@ function applyGrid(newGrid, immediate, opts) {
       const idx = pendingFlipTimeouts.indexOf(tid);
       if (idx >= 0) pendingFlipTimeouts.splice(idx, 1);
       /* Reset settle transform */
-      ref.inner.style.transform = '';
-      beginSingleFlip(key, ref, ch.row, ch.col, ch.from, firstTarget, queue, dur);
+      if (ref) ref.inner.style.transform = '';
+      beginSingleFlip(key, ref, ch.row, ch.col, ch.from, firstTarget, queue, dur, useRealistic);
       startAnimationLoop();
     }, delay);
     pendingFlipTimeouts.push(tid);
@@ -2650,6 +3406,9 @@ function effectiveCellSize() {
 }
 
 function autoSizeBoard() {
+  /* User has pinned rows/cols via the sliders — keep their grid, scaleBoard
+     still shrinks it to fit the viewport. */
+  if (settings.manualGrid) return;
   /* Calculate how many rows/cols fit the viewport at current cell size */
   const cellW = effectiveCellSize();
   const cellH = Math.round(cellW * 1.42);
@@ -2679,6 +3438,7 @@ function scaleBoard() {
   const scale = Math.min(maxW / boardW, maxH / boardH, 1);
 
   frame.style.transform = `scale(${scale})`;
+  if (glActive) glResize();
 }
 
 /* ══════════════════════════════════════════
@@ -2761,6 +3521,78 @@ function closeEditor() {
   editingSceneIndex = -1;
 }
 
+/* ══════════════════════════════════════════
+   QUICK TEXT MODE
+   Type straight onto the board. "|" splits
+   lines, {shape} syntax works, updates live.
+   ══════════════════════════════════════════ */
+let quickTextTimer = null;
+let lastQuickApplied = null;
+
+function isQuickTextOpen() {
+  return document.getElementById('quickTextBar').classList.contains('open');
+}
+
+function applyQuickText() {
+  const raw = document.getElementById('quickTextInput').value;
+  /* Don't blank the board just because the bar opened empty */
+  if (raw === lastQuickApplied || (raw.trim() === '' && lastQuickApplied === null)) return;
+  lastQuickApplied = raw;
+  stopLiveUpdates();
+  const lines = raw.split('|').map(s => s.trim());
+  const grid = linesToGrid(lines, settings.rows, settings.cols, 'center');
+  /* Fast skip-mode flips while typing — a full realistic drum cycle would
+     leave stale characters spinning for seconds after every correction. */
+  applyGrid(grid, false, { realistic: false, extraFlips: 1, stagger: 10, jitter: 25, flipDirection: 'right' });
+}
+
+function openQuickText() {
+  const bar = document.getElementById('quickTextBar');
+  const input = document.getElementById('quickTextInput');
+  bar.classList.add('open');
+  document.getElementById('btnQuickText').classList.add('active-mode');
+  /* Hold auto-rotate while typing */
+  autoRotatePaused = true;
+  stopAutoRotate();
+  clearTimeout(window._autoResume);
+  input.focus();
+  input.select();
+}
+
+function closeQuickText() {
+  const bar = document.getElementById('quickTextBar');
+  if (!bar.classList.contains('open')) return;
+  bar.classList.remove('open');
+  document.getElementById('btnQuickText').classList.remove('active-mode');
+  document.getElementById('quickTextInput').blur();
+  clearTimeout(quickTextTimer);
+  lastQuickApplied = null;
+  /* Resume auto-rotate */
+  autoRotatePaused = false;
+  if (settings.autoRotate) startAutoRotate();
+}
+
+function setupQuickText() {
+  const input = document.getElementById('quickTextInput');
+  document.getElementById('btnQuickText').addEventListener('click', () => {
+    if (isQuickTextOpen()) closeQuickText();
+    else openQuickText();
+  });
+  input.addEventListener('input', () => {
+    clearTimeout(quickTextTimer);
+    quickTextTimer = setTimeout(applyQuickText, 350);
+  });
+  input.addEventListener('keydown', (e) => {
+    e.stopPropagation(); /* don't trigger board shortcuts while typing */
+    if (e.key === 'Enter') {
+      clearTimeout(quickTextTimer);
+      applyQuickText();
+    } else if (e.key === 'Escape') {
+      closeQuickText();
+    }
+  });
+}
+
 /* Wire up all config controls */
 function setupConfigUI() {
   document.getElementById('btnConfig').addEventListener('click', openConfig);
@@ -2769,8 +3601,8 @@ function setupConfigUI() {
 
   /* Sliders */
   const sliders = [
-    { id: 'cfgRows', key: 'rows', valId: 'cfgRowsVal', fmt: v => v, rebuild: true },
-    { id: 'cfgCols', key: 'cols', valId: 'cfgColsVal', fmt: v => v, rebuild: true },
+    { id: 'cfgRows', key: 'rows', valId: 'cfgRowsVal', fmt: v => v, rebuild: true, manual: true },
+    { id: 'cfgCols', key: 'cols', valId: 'cfgColsVal', fmt: v => v, rebuild: true, manual: true },
     { id: 'cfgCellSize', key: 'cellSize', valId: 'cfgCellSizeVal', fmt: v => v, rebuild: true },
     { id: 'cfgSpeed', key: 'flipSpeed', valId: 'cfgSpeedVal', fmt: v => v + 'ms' },
     { id: 'cfgStagger', key: 'stagger', valId: 'cfgStaggerVal', fmt: v => v + 'ms' },
@@ -2784,7 +3616,7 @@ function setupConfigUI() {
     { id: 'cfgAutoInterval', key: 'autoRotateInterval', valId: 'cfgAutoIntervalVal', fmt: v => v + 's' },
   ];
 
-  sliders.forEach(({ id, key, valId, fmt, rebuild, sound, room }) => {
+  sliders.forEach(({ id, key, valId, fmt, rebuild, sound, room, manual }) => {
     const input = document.getElementById(id);
     const valEl = document.getElementById(valId);
     input.value = settings[key];
@@ -2793,6 +3625,7 @@ function setupConfigUI() {
     input.addEventListener('input', () => {
       const v = parseInt(input.value);
       settings[key] = v;
+      if (manual) settings.manualGrid = true;
       valEl.textContent = fmt(v);
       saveSettings();
 
@@ -2852,6 +3685,13 @@ function setupConfigUI() {
     if (presetSelect.value !== 'custom') {
       applySoundPreset(presetSelect.value);
     }
+  });
+
+  /* Fit To Screen: release a pinned rows/cols grid back to auto-sizing */
+  document.getElementById('btnFitScreen').addEventListener('click', () => {
+    settings.manualGrid = false;
+    saveSettings();
+    rebuildBoard();
   });
 
   /* Test sound button */
@@ -2960,6 +3800,7 @@ function setupConfigUI() {
       document.querySelectorAll('.theme-swatch').forEach(s => s.classList.remove('active'));
       swatch.classList.add('active');
       saveSettings();
+      glOnThemeChange();
     });
   });
 
@@ -3145,9 +3986,12 @@ function loadSettings() {
     const saved = localStorage.getItem('splitFlap_settings');
     if (saved) {
       const parsed = JSON.parse(saved);
-      /* Don't restore rows/cols — they are auto-calculated per viewport */
-      delete parsed.rows;
-      delete parsed.cols;
+      /* Don't restore rows/cols unless the user pinned them — otherwise they
+         are auto-calculated per viewport */
+      if (!parsed.manualGrid) {
+        delete parsed.rows;
+        delete parsed.cols;
+      }
       Object.assign(settings, parsed);
     }
     const savedScenes = localStorage.getItem('splitFlap_scenes');
@@ -3174,7 +4018,7 @@ function rebuildBoard() {
   /* Recalculate dimensions to fill viewport */
   autoSizeBoard();
 
-  createBoardDOM();
+  createBoard();
   scaleBoard();
 
   /* Sync config slider display values */
@@ -3259,7 +4103,7 @@ function init() {
   autoSizeBoard();
 
   /* Build board */
-  createBoardDOM();
+  createBoard();
   scaleBoard();
 
   /* Initialize blank grid */
@@ -3276,6 +4120,7 @@ function init() {
 
   /* Setup config UI */
   setupConfigUI();
+  setupQuickText();
   updateMuteIcon();
   renderSceneList();
 
@@ -3376,9 +4221,15 @@ function init() {
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
       closeConfig();
+      closeQuickText();
     }
     /* Don't cycle scenes if user is typing in an input */
     if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+    if (e.key === 't' || e.key === 'T') {
+      openQuickText();
+      e.preventDefault();
+      return;
+    }
     const all = getAllScenes();
     if (e.key === 'ArrowRight') {
       applySceneByIndex((settings.activeSceneIndex + 1) % all.length);

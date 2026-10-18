@@ -6,8 +6,9 @@ A realistic interactive split-flap display simulator that runs entirely in your 
 
 ## Features
 
-- **Realistic animation** — 3D CSS flip transforms with staggered timing and jitter
-- **Mechanical sound** — Web Audio API synthesis with configurable tone, snap, and body
+- **Realistic animation** — instanced WebGL renderer (DOM/CSS fallback) with gravity-based flap physics: drum release, free-fall, impact bounce, dynamic lighting and cast shadows
+- **Fast** — one draw call renders 1000+ tiles at full frame rate; sounds play at the moment of card impact
+- **Mechanical sound** — Web Audio API synthesis with configurable tone, snap, and body, glued by a master compressor
 - **Sound presets** — Waterfall, Mechanical, Soft, Crisp, Heavy
 - **Customizable scenes** — Write your own messages with text and shape syntax (`{heart}`, `{star}`, `{arrow}`, etc.)
 - **Live data scenes** — Real-time clock, local weather (Open-Meteo), and stock market indices
